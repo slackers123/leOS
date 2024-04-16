@@ -1,0 +1,13 @@
+[workspace]
+# name = "leo"
+resolver = "2"
+members = [ 
+  "leo-applications/leo-browser", 
+  "leo-libs",
+  "leo-shared", 
+  "leos-kernel", 
+  "leos-run", 
+  "leos-serivces"
+]
+default-members = ["leos-run"]
+

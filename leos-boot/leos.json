@@ -1,0 +1,8 @@
+{
+  "config": "leos-boot/bootenv.cfg",
+  "initrd": {"file": "leos-boot/initrd/leos-kernel"},
+  "partitions": [
+    { "type": "boot", "size": 16 }
+  ]
+}
+
