@@ -1,7 +1,7 @@
 [workspace]
 # name = "leo"
 resolver = "2"
-members = [ 
+members = [ "gui_experiments", 
   "leo-applications/leo-browser", 
   "leo-libs",
   "leo-shared", 
