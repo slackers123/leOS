@@ -9,8 +9,10 @@ mod border;
 mod box_extend;
 mod math;
 mod padding;
+mod path;
 mod rect;
 mod render;
+mod vertex;
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();

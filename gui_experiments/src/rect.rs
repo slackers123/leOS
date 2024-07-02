@@ -1,6 +1,8 @@
+use mathlib::{color::ColA, types::Float, vector::Vec2};
+
 use crate::{
     border::Border,
-    math::{ACol, Extent2, Vec2},
+    math::Extent2,
     padding::Padding,
     render::{Renderable, SimpleBuffer},
 };
@@ -10,7 +12,7 @@ pub struct Rect {
     pub content: Extent2<u32>,
     pub padding: Padding,
     pub border: Border,
-    pub background_col: ACol<f32>,
+    pub background_col: ColA,
 }
 
 impl Rect {
@@ -122,18 +124,18 @@ impl Renderable for Rect {
         let rad = self.border.radius;
 
         let c = Vec2 {
-            x: rad.top_left as f64,
-            y: rad.top_left as f64,
+            x: rad.top_left as Float,
+            y: rad.top_left as Float,
         };
 
         // draw top left border upper
         for x in 0..rad.top_left {
             for y in 0..rad.top_left {
                 let d = c.distance(Vec2 {
-                    x: x as f64,
-                    y: y as f64,
+                    x: x as Float,
+                    y: y as Float,
                 });
-                if d < rad.top_left as f64 && d > self.border_top_end() as f64 {
+                if d < rad.top_left as Float && d > self.border_top_end() as Float {
                     buffer.set_pix(offset.x + x, offset.y + y, self.border.col);
                 }
             }
@@ -147,18 +149,18 @@ impl Renderable for Rect {
         }
 
         let c = Vec2 {
-            x: (self.border_right_end() - rad.top_right) as f64,
-            y: rad.top_right as f64,
+            x: (self.border_right_end() - rad.top_right) as Float,
+            y: rad.top_right as Float,
         };
 
         // draw top right corner
         for x in self.border_right_end() - rad.top_right..self.border_right_end() {
             for y in 0..rad.top_right {
                 let d = c.distance(Vec2 {
-                    x: x as f64,
-                    y: y as f64,
+                    x: x as Float,
+                    y: y as Float,
                 });
-                if d > self.border_top_end() as f64 && d < rad.top_right as f64 {
+                if d > self.border_top_end() as Float && d < rad.top_right as Float {
                     buffer.set_pix(offset.x + x, offset.y + y, self.border.col);
                 }
             }
@@ -172,18 +174,18 @@ impl Renderable for Rect {
         }
 
         let c = Vec2 {
-            x: (self.border_right_end() - rad.bottom_right) as f64,
-            y: (self.border_bottom_end() - rad.bottom_right) as f64,
+            x: (self.border_right_end() - rad.bottom_right) as Float,
+            y: (self.border_bottom_end() - rad.bottom_right) as Float,
         };
 
         // draw bottom right corner
         for x in c.x as u32..self.border_right_end() {
             for y in c.y as u32..self.border_bottom_end() {
                 let d = c.distance(Vec2 {
-                    x: x as f64,
-                    y: y as f64,
+                    x: x as Float,
+                    y: y as Float,
                 });
-                if d > self.border_top_end() as f64 && d < rad.top_right as f64 {
+                if d > self.border_top_end() as Float && d < rad.top_right as Float {
                     buffer.set_pix(offset.x + x, offset.y + y, self.border.col);
                 }
             }
@@ -197,18 +199,18 @@ impl Renderable for Rect {
         }
 
         let c = Vec2 {
-            x: rad.bottom_left as f64,
-            y: (self.border_bottom_end() - rad.bottom_left) as f64,
+            x: rad.bottom_left as Float,
+            y: (self.border_bottom_end() - rad.bottom_left) as Float,
         };
 
         // draw bottom left corner
         for x in 0..rad.bottom_left {
             for y in c.y as u32..c.y as u32 + rad.bottom_left {
                 let d = c.distance(Vec2 {
-                    x: x as f64,
-                    y: y as f64,
+                    x: x as Float,
+                    y: y as Float,
                 });
-                if d > self.border_top_end() as f64 && d < rad.top_right as f64 {
+                if d > self.border_top_end() as Float && d < rad.top_right as Float {
                     buffer.set_pix(offset.x + x, offset.y + y, self.border.col);
                 }
             }
