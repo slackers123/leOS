@@ -1,13 +1,12 @@
 [workspace]
 # name = "leo"
 resolver = "2"
-members = [ "gui_experiments", 
-  "leo-applications/leo-browser", 
-  "leo-libs",
-  "leo-shared", 
-  "leos-kernel", 
-  "leos-run", 
-  "leos-serivces"
+members = [
+    "gui_experiments",
+    "leo-applications/leo-browser",
+    "leo-libs/drawlib", "leo-libs/mathlib",
+    "leo-libs/ttflib",
+    "leos-kernel",
+    "leos-run",
 ]
 default-members = ["leos-run"]
-

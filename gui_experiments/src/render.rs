@@ -1,126 +1,66 @@
-use drawlib::{
-    bezier::Bezier, draw_target::DrawTarget, drawable::Drawable, line::Line2, rect::Rect2,
-    tri::Tri2,
-};
-use mathlib::{
-    color::ColA,
-    types::{Float, Uint},
-    vector::Vec2,
-};
+use drawlib::{bezier::Bezier2, draw_target::DrawTarget, tri::Tri2};
+use mathlib::{color::ColA, types::Uint, vector::Vec2};
 
-use crate::{
-    border::Border,
-    math::{Corners, Extent2, Splat},
-    padding::Padding,
-    rect::Rect,
-};
+use crate::renderable::Renderable;
 
 pub struct Renderer {
-    renderables: Vec<Box<dyn Renderable>>,
+    renderables: Vec<Renderable>,
 }
 
 impl Default for Renderer {
     fn default() -> Self {
         Self {
-            renderables: vec![
-                Box::new(Rect {
-                    rel_pos: Vec2 { x: 0, y: 0 },
-                    content: Extent2 {
-                        pos: Vec2::<Uint>::ZERO,
-                        width: 100,
-                        height: 100,
-                    },
-                    padding: Padding {
-                        size: Splat::splat(0),
-                    },
-                    background_col: ColA {
-                        r: 0.0,
-                        g: 1.0,
-                        b: 0.0,
-                        a: 0.5,
-                    },
-                    border: Border {
-                        radius: Corners::splat(20),
-                        size: Splat::splat(10),
-                        col: ColA {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 1.0,
-                            a: 1.0,
-                        },
-                    },
-                }),
-                Box::new(Rect {
-                    rel_pos: Vec2 { x: 50, y: 50 },
-                    content: Extent2 {
-                        pos: Vec2::<Uint>::ZERO,
-                        width: 100,
-                        height: 100,
-                    },
-                    padding: Padding {
-                        size: Splat::splat(0),
-                    },
-                    background_col: ColA {
-                        r: 1.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.5,
-                    },
-                    border: Border {
-                        radius: Splat::splat(0),
-                        size: Splat::splat(0),
-                        col: ColA {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 0.0,
-                        },
-                    },
-                }),
-            ],
+            renderables: vec![Renderable::Bezier2(Bezier2::new(
+                Vec2 { x: 50, y: 500 },
+                Vec2 { x: 50, y: 50 },
+                Vec2 { x: 500, y: 50 },
+                10,
+                ColA::WHITE,
+            ))],
         }
     }
 }
 
 impl Renderer {
-    pub fn render(&mut self, buffer: &mut [u32], width: u32, _height: u32) {
-        let mut simple_buffer = SimpleBuffer::new(buffer, width);
+    pub fn add_renderable(&mut self, renderable: Renderable) {
+        self.renderables.push(renderable);
+    }
+    pub fn render(&self, buffer: &mut [u32], width: u32, height: u32) {
+        let mut simple_buffer = SimpleBuffer::new(buffer, width, height);
         self.draw_to_buffer(&mut simple_buffer);
     }
 
     fn draw_to_buffer(&self, buffer: &mut SimpleBuffer) {
-        let line = Line2::new(
-            Vec2::new(50.0, 50.0),
-            Vec2::new(500.0, 500.0),
-            100.0,
-            ColA::WHITE,
-        );
-
-        // let tri = Tri2::new(
-        //     Vec2::new(20.0, 100.0),
-        //     Vec2::new(50.0, 20.0),
-        //     Vec2::new(100.0, 100.0),
-        //     ColA::WHITE,
-        // );
-        line.draw(buffer);
+        for renderable in &self.renderables {
+            renderable.draw(buffer);
+        }
     }
 }
 
 pub struct SimpleBuffer<'a> {
-    buffer: &'a mut [u32],
-    width: u32,
+    buffer: &'a mut [Uint],
+    width: Uint,
+    height: Uint,
 }
 
 impl<'a> SimpleBuffer<'a> {
-    pub fn new(buffer: &'a mut [u32], width: u32) -> SimpleBuffer<'a> {
-        Self { buffer, width }
+    pub fn new(buffer: &'a mut [Uint], width: Uint, height: Uint) -> SimpleBuffer<'a> {
+        Self {
+            buffer,
+            width,
+            height,
+        }
     }
 
     pub fn set_pix(&mut self, x: u32, y: u32, col: ColA) {
+        if x > self.width || y > self.height {
+            return;
+        }
         let index = y * self.width + x;
         let old = self.buffer[index as usize];
         let old_r = ((old >> 16) & 0xFF) as f32 / 255.0;
         let old_g = ((old >> 8) & 0xFF) as f32 / 255.0;
+        #[allow(clippy::identity_op)]
         let old_b = ((old >> 0) & 0xFF) as f32 / 255.0;
         let old = ColA {
             r: old_r,
@@ -141,8 +81,4 @@ impl<'a> DrawTarget for SimpleBuffer<'a> {
     fn put_px(&mut self, pix: Vec2<Uint>, col: ColA) {
         self.set_pix(pix.x, pix.y, col)
     }
-}
-
-pub trait Renderable {
-    fn render(&self, top_pos: Vec2<u32>, buffer: &mut SimpleBuffer);
 }
