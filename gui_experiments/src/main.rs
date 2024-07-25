@@ -1,14 +1,15 @@
-use drawlib::bezier::Bezier2;
-use drawlib::line::Line2;
-use drawlib::tri::Tri2;
+use drawlib::path::{CBezierTo, Fill, LineTo, MoveTo, Path, QBezierTo, Stroke};
+use drawlib::point::Point2;
 use mathlib::color::ColA;
-use mathlib::types::{Float, Uint};
+use mathlib::types::Float;
 use mathlib::vector::Vec2;
 use render::Renderer;
+use renderable::Renderable;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::time::Instant;
-use winit::event::{DeviceEvent, ElementState, Event, MouseButton, WindowEvent};
+use ttflib::points_from_gt;
+use winit::event::{ElementState, Event, MouseButton, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
@@ -16,6 +17,9 @@ mod render;
 mod renderable;
 
 fn main() {
+    let font = ttflib::load_font("../Poppins-Regular.ttf".into());
+    let test: Vec<char> = "Hello World!".chars().collect();
+
     let event_loop = EventLoop::new().unwrap();
     let window = Rc::new(WindowBuilder::new().build(&event_loop).unwrap());
     let context = softbuffer::Context::new(window.clone()).unwrap();
@@ -23,10 +27,45 @@ fn main() {
 
     let mut renderer = Renderer::default();
 
-    let mut p1 = None;
-    let mut p2 = None;
+    for (i, c) in test.iter().enumerate() {
+        let h_offset = i as Float * 100.0;
+        if let Some((glyph_header, glyph_table)) = font.glyhps.get(&c) {
+            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0));
+            for point in &points {
+                renderer.add_renderable(Renderable::Point2(Point2 {
+                    c: *point + Vec2 { x: 10.0, y: 10.0 },
+                    r: 10.0,
+                    col: ColA::RED,
+                }))
+            }
+            let mut i = 0;
+            for c_end in &glyph_table.end_pts_of_contours {
+                let mut path = Path::new(
+                    Stroke {
+                        thickness: 10.0,
+                        col: ColA::GREEN,
+                    },
+                    Fill {},
+                );
+                path.add_moveto(MoveTo {
+                    target: points[i] + Vec2 { x: 10.0, y: 10.0 },
+                });
+                for idx in (i + 1)..=*c_end as usize {
+                    path.add_lineto(drawlib::path::LineTo {
+                        target: points[idx as usize] + Vec2 { x: 10.0, y: 10.0 },
+                    })
+                }
+                path.add_lineto(LineTo {
+                    target: points[i] + Vec2 { x: 10.0, y: 10.0 },
+                });
+                path.build_cache();
+                renderer.add_renderable(Renderable::Path(path));
+                i = *c_end as usize + 1;
+            }
+        }
+    }
 
-    let mut mouse_pos = Vec2::new(0, 0);
+    let mut mouse_pos = Vec2::new(0.0, 0.0);
     let mut frames = 0;
     let mut last_timer = Instant::now();
     event_loop
@@ -42,7 +81,7 @@ fn main() {
                             position,
                         },
                 } if window_id == window.id() => {
-                    mouse_pos = Vec2::new(position.x as Uint, position.y as Uint);
+                    mouse_pos = Vec2::new(position.x as Float, position.y as Float);
                 }
                 Event::WindowEvent {
                     window_id,
@@ -52,23 +91,7 @@ fn main() {
                             state: ElementState::Pressed,
                             button: MouseButton::Left,
                         },
-                } if window_id == window.id() => {
-                    if p1.is_none() {
-                        p1 = Some(mouse_pos);
-                    } else if p2.is_none() {
-                        p2 = Some(mouse_pos)
-                    } else {
-                        renderer.add_renderable(renderable::Renderable::Bezier2(Bezier2::new(
-                            p1.unwrap(),
-                            p2.unwrap(),
-                            mouse_pos,
-                            10,
-                            ColA::WHITE,
-                        )));
-                        p1 = None;
-                        p2 = None;
-                    }
-                }
+                } if window_id == window.id() => {}
                 Event::WindowEvent {
                     window_id,
                     event: WindowEvent::RedrawRequested,
@@ -91,7 +114,7 @@ fn main() {
 
                     frames += 1;
                     if last_timer.elapsed().as_millis() > 1000 {
-                        println!("fps: {frames}");
+                        // println!("fps: {frames}");
                         last_timer = Instant::now();
                         frames = 0;
                     }

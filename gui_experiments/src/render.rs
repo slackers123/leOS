@@ -1,22 +1,16 @@
-use drawlib::{bezier::Bezier2, draw_target::DrawTarget, tri::Tri2};
+use drawlib::draw_target::DrawTarget;
 use mathlib::{color::ColA, types::Uint, vector::Vec2};
 
 use crate::renderable::Renderable;
 
 pub struct Renderer {
-    renderables: Vec<Renderable>,
+    pub renderables: Vec<Renderable>,
 }
 
 impl Default for Renderer {
     fn default() -> Self {
         Self {
-            renderables: vec![Renderable::Bezier2(Bezier2::new(
-                Vec2 { x: 50, y: 500 },
-                Vec2 { x: 50, y: 50 },
-                Vec2 { x: 500, y: 50 },
-                10,
-                ColA::WHITE,
-            ))],
+            renderables: vec![],
         }
     }
 }

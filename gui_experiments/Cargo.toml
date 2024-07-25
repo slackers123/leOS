@@ -10,3 +10,4 @@ softbuffer = "0.4"
 winit = "0.29"
 drawlib = { path = "../leo-libs/drawlib" }
 mathlib = { path = "../leo-libs/mathlib" }
+ttflib = { path = "../leo-libs/ttflib" }
