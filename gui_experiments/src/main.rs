@@ -27,10 +27,11 @@ fn main() {
 
     let mut renderer = Renderer::default();
 
-    for (i, c) in test.iter().enumerate() {
-        let h_offset = i as Float * 100.0;
-        if let Some((glyph_header, glyph_table)) = font.glyhps.get(&c) {
-            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0));
+    let mut h_offset = 0.0;
+    for c in test.iter() {
+        if let Some((glyph_header, glyph_table, advance_width)) = font.glyhps.get(&c) {
+            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.2);
+            h_offset += *advance_width as Float;
             for point in &points {
                 renderer.add_renderable(Renderable::Point2(Point2 {
                     c: *point + Vec2 { x: 10.0, y: 10.0 },
