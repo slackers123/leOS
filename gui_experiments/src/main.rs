@@ -1,5 +1,4 @@
-use drawlib::path::{CBezierTo, Fill, LineTo, MoveTo, Path, QBezierTo, Stroke};
-use drawlib::point::Point2;
+use drawlib::path::{Fill, LineTo, MoveTo, Path, QBezierTo, Stroke};
 use mathlib::color::ColA;
 use mathlib::types::Float;
 use mathlib::vector::Vec2;
@@ -30,17 +29,10 @@ fn main() {
     let mut h_offset = 0.0;
     for c in test.iter() {
         if let Some((glyph_header, glyph_table, advance_width)) = font.glyhps.get(&c) {
-            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.2);
+            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.3);
             h_offset += *advance_width as Float;
-            for point in &points {
-                renderer.add_renderable(Renderable::Point2(Point2 {
-                    c: *point + Vec2 { x: 10.0, y: 10.0 },
-                    r: 10.0,
-                    col: ColA::RED,
-                }))
-            }
-            let mut i = 0;
-            for c_end in &glyph_table.end_pts_of_contours {
+            for cont in points {
+                let cont_start = cont[0];
                 let mut path = Path::new(
                     Stroke {
                         thickness: 10.0,
@@ -49,19 +41,37 @@ fn main() {
                     Fill {},
                 );
                 path.add_moveto(MoveTo {
-                    target: points[i] + Vec2 { x: 10.0, y: 10.0 },
+                    target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
                 });
-                for idx in (i + 1)..=*c_end as usize {
-                    path.add_lineto(drawlib::path::LineTo {
-                        target: points[idx as usize] + Vec2 { x: 10.0, y: 10.0 },
-                    })
+                let mut mid_spline1 = None;
+                for point in cont {
+                    // renderer.add_renderable(Renderable::Point2(Point2 {
+                    //     c: point.0 + Vec2 { x: 10.0, y: 10.0 },
+                    //     r: 10.0,
+                    //     col: if point.1 { ColA::RED } else { ColA::GREEN },
+                    // }));
+                    if let Some(c1) = mid_spline1 {
+                        path.add_qbezierto(QBezierTo {
+                            c: c1 + Vec2 { x: 10.0, y: 10.0 },
+                            p1: point.0 + Vec2 { x: 10.0, y: 10.0 },
+                        });
+                        mid_spline1 = None;
+                    } else {
+                        if point.1 {
+                            path.add_lineto(drawlib::path::LineTo {
+                                target: point.0 + Vec2 { x: 10.0, y: 10.0 },
+                            });
+                        } else {
+                            mid_spline1 = Some(point.0)
+                        }
+                    }
                 }
+
                 path.add_lineto(LineTo {
-                    target: points[i] + Vec2 { x: 10.0, y: 10.0 },
+                    target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
                 });
                 path.build_cache();
                 renderer.add_renderable(Renderable::Path(path));
-                i = *c_end as usize + 1;
             }
         }
     }
