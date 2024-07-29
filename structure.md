@@ -10,3 +10,12 @@ leo (the workspace/root project directory)
     | - hello world program with leo main etc
   | - leo-browser (the browser of the leo project)
 | - leo-tests (test for the project )
+
+## Note:
+To add functionality we are allowed to use:
+- Rust builtins (core, alloc, etc.)
+- self written code
+- code from others (as little as possible) with proper citation
+
+Using crates/libraries from outside of this repo and not written for
+this project goes against the spirit of the project

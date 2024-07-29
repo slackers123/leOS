@@ -11,16 +11,15 @@ use core::panic::PanicInfo;
 #[allow(non_camel_case_types)]
 mod bootboot;
 
-mod common;
 mod error;
 mod interrupts;
 mod sys;
 mod util;
 
 use bootboot::BOOTBOOT;
+use mathlib::color::ColA;
 
 use crate::{
-    common::Color,
     sys::{
         fb::{FBType, FB},
         io::kprintln,
@@ -41,12 +40,7 @@ fn _start() -> ! {
     }
     let mut fb = FB::new().unwrap();
 
-    let col = Color {
-        r: 0,
-        g: 150,
-        b: 150,
-        a: 0,
-    };
+    let col = ColA::new(0.0, 0.6, 0.6, 1.0);
 
     let col = match fb.info.fb_type {
         FBType::ARGB => col.as_argb(),

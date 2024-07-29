@@ -12,9 +12,11 @@ pub struct IdtEntry {
 }
 
 #[repr(transparent)]
+#[derive(Debug, Copy, Clone)]
 pub struct IdtEntryOptions(u16);
 
 #[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
 pub struct SegmentSelector(u16);
 
 impl SegmentSelector {
@@ -27,11 +29,10 @@ impl SegmentSelector {
     }
 
     pub fn get_rpl(&self) -> PrivilegeLevel {
-        PrivilegeLevel::from_u16(self.0.get_bits(0..2))
+        PrivilegeLevel::from_u16(self.0 & 0b11)
     }
 }
 
-#[repr(u8)]
 pub enum PrivilegeLevel {
     Ring0 = 0,
     Ring1 = 1,

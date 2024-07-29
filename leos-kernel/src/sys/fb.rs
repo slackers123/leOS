@@ -3,9 +3,10 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+use mathlib::color::ColA;
+
 use crate::{
     bootboot::{self, BOOTBOOT},
-    common::Color,
     error::{KError, KResult},
 };
 
@@ -79,7 +80,7 @@ impl FB {
         Ok(Self { info, raw_fb })
     }
 
-    pub fn put_px(&mut self, x: u32, y: u32, col: Color) -> KResult<()> {
+    pub fn put_px(&mut self, x: u32, y: u32, col: ColA) -> KResult<()> {
         if x > self.info.width || y > self.info.height {
             return Err(KError::OutOfRange);
         }

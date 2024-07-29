@@ -17,7 +17,7 @@ mod renderable;
 
 fn main() {
     let font = ttflib::load_font("../Poppins-Regular.ttf".into());
-    let test: Vec<char> = "Hello World!".chars().collect();
+    let test: Vec<char> = "Hello, World!".chars().collect();
 
     let event_loop = EventLoop::new().unwrap();
     let window = Rc::new(WindowBuilder::new().build(&event_loop).unwrap());
@@ -28,8 +28,12 @@ fn main() {
 
     let mut h_offset = 0.0;
     for c in test.iter() {
+        if *c == ' ' {
+            h_offset += 800.0;
+            continue;
+        }
         if let Some((glyph_header, glyph_table, advance_width)) = font.glyhps.get(&c) {
-            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.3);
+            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.2);
             h_offset += *advance_width as Float;
             for cont in points {
                 let cont_start = cont[0];
@@ -43,41 +47,47 @@ fn main() {
                 path.add_moveto(MoveTo {
                     target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
                 });
-                let mut mid_spline1 = None;
-                for point in cont {
+                let mut mid_spline = None;
+                for point in cont[1..cont.len()].iter() {
                     // renderer.add_renderable(Renderable::Point2(Point2 {
                     //     c: point.0 + Vec2 { x: 10.0, y: 10.0 },
                     //     r: 10.0,
                     //     col: if point.1 { ColA::RED } else { ColA::GREEN },
                     // }));
-                    if let Some(c1) = mid_spline1 {
+                    if let Some(c) = mid_spline {
                         path.add_qbezierto(QBezierTo {
-                            c: c1 + Vec2 { x: 10.0, y: 10.0 },
+                            c: c + Vec2 { x: 10.0, y: 10.0 },
                             p1: point.0 + Vec2 { x: 10.0, y: 10.0 },
                         });
-                        mid_spline1 = None;
+                        mid_spline = None;
                     } else {
                         if point.1 {
                             path.add_lineto(drawlib::path::LineTo {
                                 target: point.0 + Vec2 { x: 10.0, y: 10.0 },
                             });
                         } else {
-                            mid_spline1 = Some(point.0)
+                            mid_spline = Some(point.0)
                         }
                     }
                 }
-
-                path.add_lineto(LineTo {
-                    target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
-                });
+                if let Some(c) = mid_spline {
+                    path.add_qbezierto(QBezierTo {
+                        c: c + Vec2 { x: 10.0, y: 10.0 },
+                        p1: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
+                    });
+                } else {
+                    path.add_lineto(LineTo {
+                        target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
+                    });
+                }
                 path.build_cache();
                 renderer.add_renderable(Renderable::Path(path));
             }
         }
     }
 
-    let mut mouse_pos = Vec2::new(0.0, 0.0);
-    let mut frames = 0;
+    // let mut mouse_pos = Vec2::new(0.0, 0.0);
+    // let mut frames = 0;
     let mut last_timer = Instant::now();
     event_loop
         .run(move |event, elwt| {
@@ -89,10 +99,10 @@ fn main() {
                     event:
                         WindowEvent::CursorMoved {
                             device_id: _,
-                            position,
+                            position: _,
                         },
                 } if window_id == window.id() => {
-                    mouse_pos = Vec2::new(position.x as Float, position.y as Float);
+                    // mouse_pos = Vec2::new(position.x as Float, position.y as Float);
                 }
                 Event::WindowEvent {
                     window_id,
@@ -123,11 +133,11 @@ fn main() {
 
                     buffer.present().unwrap();
 
-                    frames += 1;
+                    // frames += 1;
                     if last_timer.elapsed().as_millis() > 1000 {
                         // println!("fps: {frames}");
                         last_timer = Instant::now();
-                        frames = 0;
+                        // frames = 0;
                     }
                     window.request_redraw();
                 }
