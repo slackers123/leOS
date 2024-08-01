@@ -1,4 +1,5 @@
-use drawlib::path::{Fill, LineTo, MoveTo, Path, QBezierTo, Stroke};
+use drawlib::line::Line2;
+use drawlib::path::{ArcTo, Fill, LineTo, MoveTo, Path, QBezierTo, Stroke};
 use mathlib::color::ColA;
 use mathlib::types::Float;
 use mathlib::vector::Vec2;
@@ -16,8 +17,8 @@ mod render;
 mod renderable;
 
 fn main() {
-    let font = ttflib::load_font("../Poppins-Regular.ttf".into());
-    let test: Vec<char> = "Hello, World!".chars().collect();
+    // let font = ttflib::load_font("../Poppins-Regular.ttf".into());
+    // let test: Vec<char> = "Hello, World!".chars().collect();
 
     let event_loop = EventLoop::new().unwrap();
     let window = Rc::new(WindowBuilder::new().build(&event_loop).unwrap());
@@ -26,65 +27,97 @@ fn main() {
 
     let mut renderer = Renderer::default();
 
-    let mut h_offset = 0.0;
-    for c in test.iter() {
-        if *c == ' ' {
-            h_offset += 800.0;
-            continue;
-        }
-        if let Some((glyph_header, glyph_table, advance_width)) = font.glyhps.get(&c) {
-            let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.2);
-            h_offset += *advance_width as Float;
-            for cont in points {
-                let cont_start = cont[0];
-                let mut path = Path::new(
-                    Stroke {
-                        thickness: 10.0,
-                        col: ColA::GREEN,
-                    },
-                    Fill {},
-                );
-                path.add_moveto(MoveTo {
-                    target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
-                });
-                let mut mid_spline = None;
-                for point in cont[1..cont.len()].iter() {
-                    // renderer.add_renderable(Renderable::Point2(Point2 {
-                    //     c: point.0 + Vec2 { x: 10.0, y: 10.0 },
-                    //     r: 10.0,
-                    //     col: if point.1 { ColA::RED } else { ColA::GREEN },
-                    // }));
-                    if let Some(c) = mid_spline {
-                        path.add_qbezierto(QBezierTo {
-                            c: c + Vec2 { x: 10.0, y: 10.0 },
-                            p1: point.0 + Vec2 { x: 10.0, y: 10.0 },
-                        });
-                        mid_spline = None;
-                    } else {
-                        if point.1 {
-                            path.add_lineto(drawlib::path::LineTo {
-                                target: point.0 + Vec2 { x: 10.0, y: 10.0 },
-                            });
-                        } else {
-                            mid_spline = Some(point.0)
-                        }
-                    }
-                }
-                if let Some(c) = mid_spline {
-                    path.add_qbezierto(QBezierTo {
-                        c: c + Vec2 { x: 10.0, y: 10.0 },
-                        p1: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
-                    });
-                } else {
-                    path.add_lineto(LineTo {
-                        target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
-                    });
-                }
-                path.build_cache();
-                renderer.add_renderable(Renderable::Path(path));
-            }
-        }
-    }
+    // let mut h_offset = 0.0;
+    // for c in test.iter() {
+    //     if *c == ' ' {
+    //         h_offset += 800.0;
+    //         continue;
+    //     }
+    //     if let Some((glyph_header, glyph_table, advance_width)) = font.glyhps.get(&c) {
+    //         let points = points_from_gt(glyph_header, glyph_table, Vec2::new(h_offset, 0.0), 0.2);
+    //         h_offset += *advance_width as Float;
+    //         for cont in points {
+    //             let cont_start = cont[0];
+    //             let mut path = Path::new(
+    //                 Stroke {
+    //                     thickness: 10.0,
+    //                     col: ColA::GREEN,
+    //                 },
+    //                 Fill {},
+    //             );
+    //             path.add_moveto(MoveTo {
+    //                 target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
+    //             });
+    //             let mut mid_spline = None;
+    //             for point in cont[1..cont.len()].iter() {
+    //                 // renderer.add_renderable(Renderable::Point2(Point2 {
+    //                 //     c: point.0 + Vec2 { x: 10.0, y: 10.0 },
+    //                 //     r: 10.0,
+    //                 //     col: if point.1 { ColA::RED } else { ColA::GREEN },
+    //                 // }));
+    //                 if let Some(c) = mid_spline {
+    //                     path.add_qbezierto(QBezierTo {
+    //                         c: c + Vec2 { x: 10.0, y: 10.0 },
+    //                         p1: point.0 + Vec2 { x: 10.0, y: 10.0 },
+    //                     });
+    //                     mid_spline = None;
+    //                 } else {
+    //                     if point.1 {
+    //                         path.add_lineto(drawlib::path::LineTo {
+    //                             target: point.0 + Vec2 { x: 10.0, y: 10.0 },
+    //                         });
+    //                     } else {
+    //                         mid_spline = Some(point.0)
+    //                     }
+    //                 }
+    //             }
+    //             if let Some(c) = mid_spline {
+    //                 path.add_qbezierto(QBezierTo {
+    //                     c: c + Vec2 { x: 10.0, y: 10.0 },
+    //                     p1: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
+    //                 });
+    //             } else {
+    //                 path.add_lineto(LineTo {
+    //                     target: cont_start.0 + Vec2 { x: 10.0, y: 10.0 },
+    //                 });
+    //             }
+    //             path.build_cache();
+    //             renderer.add_renderable(Renderable::Path(path));
+    //         }
+    //     }
+    // }
+    //
+
+    renderer.add_renderable(Renderable::Line2(Line2::new(
+        Vec2::new(600, 350),
+        Vec2::new(750, 350),
+        10,
+        ColA::RED,
+    )));
+
+    let mut path = Path::new(
+        Stroke {
+            thickness: 10.0,
+            col: ColA::WHITE,
+        },
+        Fill {},
+    );
+
+    path.add_moveto(MoveTo {
+        target: Vec2::new(600.0, 350.0),
+    });
+    // a150,150 0 0,0 -150,150
+    path.add_arcto(ArcTo {
+        r: Vec2::new(150.0, 150.0),
+        x_axis_rotation: 0.0,
+        large_arc_flag: false,
+        sweep_flag: false,
+        target: Vec2::new(450.0, 500.0),
+    });
+
+    // path.add_closepath();
+    path.build_cache();
+    renderer.add_renderable(Renderable::Path(path));
 
     // let mut mouse_pos = Vec2::new(0.0, 0.0);
     // let mut frames = 0;
