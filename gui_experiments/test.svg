@@ -1,0 +1,7 @@
+<?xml version="1.0" standalone="no"?>
+<svg width="12cm" height="5.25cm" viewBox="0 0 800 800"
+     xmlns="http://www.w3.org/2000/svg" version="1.1">
+  <path d="M410,400 H590 A10,10 0 0,1 600,410 z"
+        fill="red" stroke="blue" stroke-width="5" />
+
+</svg>

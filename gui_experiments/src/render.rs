@@ -47,7 +47,7 @@ impl<'a> SimpleBuffer<'a> {
     }
 
     pub fn set_pix(&mut self, x: u32, y: u32, col: ColA) {
-        if x > self.width || y > self.height {
+        if x >= self.width || y >= self.height {
             return;
         }
         let index = y * self.width + x;
