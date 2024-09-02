@@ -3,10 +3,10 @@
 resolver = "2"
 members = [
     "gui_experiments",
-    "leo-applications/leo-browser", "leo-libs/compressionlib", "leo-libs/corelib",
+    "leo-applications/leo-browser",
+    "leo-libs/corelib",
     "leo-libs/drawlib",
     "leo-libs/mathlib",
-    "leo-libs/pnglib",
     "leo-libs/ttflib",
     "leos-kernel",
     "leos-run",
