@@ -12,4 +12,5 @@ image = "0.25"
 drawlib = { path = "../leo-libs/drawlib" }
 mathlib = { path = "../leo-libs/mathlib" }
 ttflib = { path = "../leo-libs/ttflib" }
+corelib = { path = "../leo-libs/corelib" }
 # pnglib = { path = "../leo-libs/pnglib" }
