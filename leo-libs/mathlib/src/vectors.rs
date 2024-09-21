@@ -1,4 +1,4 @@
-use std::ops::{self, AddAssign, MulAssign, SubAssign};
+use std::ops::{self, AddAssign, DivAssign, MulAssign, SubAssign};
 
 use corelib::types::Float;
 
@@ -71,9 +71,29 @@ impl<T: MulAssign + Copy> ops::Mul<T> for Vec2<T> {
 
 impl ops::Mul<Vec2<Float>> for Float {
     type Output = Vec2<Float>;
-    fn mul(self, mut rhs: Vec2<Float>) -> Self::Output {
-        rhs.x *= self;
-        rhs.y *= self;
-        rhs
+    fn mul(self, rhs: Vec2<Float>) -> Self::Output {
+        rhs * self
+    }
+}
+
+impl<T: DivAssign + Copy> ops::Div<T> for Vec2<T> {
+    type Output = Vec2<T>;
+    fn div(mut self, rhs: T) -> Self::Output {
+        self.x /= rhs;
+        self.y /= rhs;
+        self
+    }
+}
+
+impl ops::Div<Vec2<Float>> for Float {
+    type Output = Vec2<Float>;
+    fn div(self, rhs: Vec2<Float>) -> Self::Output {
+        rhs / self
+    }
+}
+
+impl<T: AddAssign + Copy> ops::AddAssign for Vec2<T> {
+    fn add_assign(&mut self, rhs: Vec2<T>) {
+        *self = *self + rhs;
     }
 }
