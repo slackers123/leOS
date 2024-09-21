@@ -1,6 +1,4 @@
-use std::time::Instant;
-
-use corelib::reader::{BigEndianReader, ByteReader, Reader};
+use corelib::reader::Reader;
 use tabledir::TableDirectory;
 use tables::{
     cmap::{self, CMAPSubtable},

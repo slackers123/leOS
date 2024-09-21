@@ -106,7 +106,7 @@ impl Readable for CMAPSubtable {
 }
 
 #[derive(Debug, Clone)]
-struct CMAPSubtableFormat4 {
+pub struct CMAPSubtableFormat4 {
     pub length: u16,
     pub language: u16,
     pub seg_count_x2: u16,
@@ -194,8 +194,7 @@ impl Readable for CMAPSubtableFormat4 {
 }
 
 #[derive(Debug, Clone)]
-struct CMAPSubtableFormat12 {
-    pub format: u16,
+pub struct CMAPSubtableFormat12 {
     pub reserved: u16,
     pub length: u32,
     pub language: u32,
@@ -205,7 +204,6 @@ struct CMAPSubtableFormat12 {
 
 impl Readable for CMAPSubtableFormat12 {
     fn read(reader: &mut corelib::reader::Reader<impl corelib::reader::ByteReader>) -> Self {
-        let format: u16 = reader.read();
         let reserved: u16 = reader.read();
         let length: u32 = reader.read();
         let language: u32 = reader.read();
@@ -213,7 +211,6 @@ impl Readable for CMAPSubtableFormat12 {
         let groups: Vec<SequentialMapGroup> = read_vec(reader, num_groups as usize);
 
         Self {
-            format,
             reserved,
             length,
             language,
@@ -224,7 +221,7 @@ impl Readable for CMAPSubtableFormat12 {
 }
 
 #[derive(Debug, Clone)]
-struct SequentialMapGroup {
+pub struct SequentialMapGroup {
     pub start_char_code: u32,
     pub end_char_code: u32,
     pub start_glyph_id: u32,

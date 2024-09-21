@@ -1,26 +1,17 @@
+use corelib::types::Uint;
 use drawlib::draw_target::DrawTarget;
 use image::{ImageBuffer, Rgba};
+use mathlib::vectors::Vec2;
 
 pub struct Qimg(pub ImageBuffer<Rgba<u8>, Vec<u8>>);
 
 impl DrawTarget for Qimg {
-    fn put_px(
+    fn put_pixel(
         &mut self,
-        pix: mathlib::vector::Vec2<mathlib::types::Uint>,
+        pos: Vec2<Uint>,
         col: mathlib::color::ColA,
-    ) {
-        let dims = self.0.dimensions();
-        if pix.x < dims.0 && pix.y < dims.1 {
-            self.0.put_pixel(
-                pix.x,
-                pix.y,
-                Rgba([
-                    (col.r * 255.0) as u8,
-                    (col.g * 255.0) as u8,
-                    (col.b * 255.0) as u8,
-                    (col.a * 255.0) as u8,
-                ]),
-            );
-        }
+    ) -> drawlib::rendererror::RenderResult<()> {
+        self.0.put_pixel(pos.x, pos.y, Rgba(col.to_rgba_arr()));
+        Ok(())
     }
 }
