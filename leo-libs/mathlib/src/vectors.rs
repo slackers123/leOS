@@ -2,7 +2,7 @@ use std::ops::{self, AddAssign, DivAssign, MulAssign, SubAssign};
 
 use corelib::types::Float;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec2<T> {
     pub x: T,
     pub y: T,
