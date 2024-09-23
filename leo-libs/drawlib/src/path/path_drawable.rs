@@ -87,6 +87,9 @@ fn qbezier_isect(p0: Vec2<Float>, p1: Vec2<Float>, p2: Vec2<Float>, p: Vec2<Floa
 }
 
 fn line_isect(t: Vec2<Float>, last_point: Vec2<Float>, p: Vec2<Float>) -> Uint {
+    if last_point == t {
+        return 0;
+    }
     if p.y > t.y && p.y > last_point.y {
         return 0;
     }
