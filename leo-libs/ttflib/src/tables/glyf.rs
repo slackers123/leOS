@@ -49,42 +49,42 @@ pub fn get_glyf(
             i += 1;
         }
 
-        let mut x_coordinates: Vec<i16> = Vec::with_capacity(flags_arr.len());
+        let mut x_coordinates: Vec<i32> = Vec::with_capacity(flags_arr.len());
         for i in 0..flags_arr.len() {
             let last = x_coordinates.last().unwrap_or(&0);
             let flags = flags_arr[i];
             if flags.x_short_vector {
                 let v = reader.read_byte();
                 if flags.x_is_same_or_positive_x_short_vector {
-                    x_coordinates.push(last + v as i16);
+                    x_coordinates.push(last + v as i32);
                 } else {
-                    x_coordinates.push(last - v as i16);
+                    x_coordinates.push(last - v as i32);
                 }
             } else {
                 if flags.x_is_same_or_positive_x_short_vector {
                     x_coordinates.push(*last);
                 } else {
-                    x_coordinates.push(last + reader.read::<i16>());
+                    x_coordinates.push(*last + reader.read::<i16>() as i32);
                 }
             }
         }
 
-        let mut y_coordinates: Vec<i16> = Vec::with_capacity(flags_arr.len());
+        let mut y_coordinates: Vec<i32> = Vec::with_capacity(flags_arr.len());
         for i in 0..flags_arr.len() {
             let last = y_coordinates.last().unwrap_or(&0);
             let flags = flags_arr[i];
             if flags.y_short_vector {
                 let v = reader.read_byte();
                 if flags.y_is_same_or_positive_y_short_vector {
-                    y_coordinates.push(last + v as i16);
+                    y_coordinates.push(last + v as i32);
                 } else {
-                    y_coordinates.push(last - v as i16);
+                    y_coordinates.push(last - v as i32);
                 }
             } else {
                 if flags.y_is_same_or_positive_y_short_vector {
                     y_coordinates.push(*last);
                 } else {
-                    y_coordinates.push(last + reader.read::<i16>());
+                    y_coordinates.push(last + reader.read::<i16>() as i32);
                 }
             }
         }
@@ -129,8 +129,8 @@ pub struct GlyphTable {
     pub instruction_length: u16,
     pub instructions: Vec<u8>,
     pub flags: Vec<GlyphFlags>,
-    pub x_coordinates: Vec<i16>,
-    pub y_coordinates: Vec<i16>,
+    pub x_coordinates: Vec<i32>,
+    pub y_coordinates: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Copy)]

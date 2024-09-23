@@ -9,7 +9,7 @@ use tables::{
 };
 
 mod tabledir;
-mod tables;
+pub mod tables;
 mod util;
 
 pub fn load_ttf<'a>(src: &'a [u8]) -> Font<'a> {
@@ -78,7 +78,7 @@ pub struct Font<'a> {
 }
 
 impl<'a> Font<'a> {
-    pub fn get_glyph(&mut self, c: char) -> GlyphTable {
+    pub fn get_glyph(&self, c: char) -> GlyphTable {
         glyf::get_glyf(
             self.glyf_table_record_offset,
             &self.src,

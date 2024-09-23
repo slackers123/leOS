@@ -3,3 +3,4 @@ pub mod drawable;
 pub mod path;
 pub mod ptri;
 pub mod rendererror;
+pub mod text;

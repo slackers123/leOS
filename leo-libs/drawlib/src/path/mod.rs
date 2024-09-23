@@ -4,6 +4,7 @@ use mathlib::{aabb::AABB, color::ColA, vectors::Vec2};
 pub mod path_drawable;
 
 pub struct Path {
+    pub pos: Vec2<Float>,
     path_segs: Vec<PathSeg>,
     vals: Vec<Float>,
     bbox: AABB<Float>,
@@ -13,6 +14,7 @@ pub struct Path {
 impl Path {
     pub fn new() -> Self {
         Self {
+            pos: Vec2::ZERO,
             path_segs: Vec::new(),
             vals: Vec::new(),
             bbox: AABB::default(),

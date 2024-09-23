@@ -11,7 +11,10 @@ impl DrawTarget for Qimg {
         pos: Vec2<Uint>,
         col: mathlib::color::ColA,
     ) -> drawlib::rendererror::RenderResult<()> {
-        self.0.put_pixel(pos.x, pos.y, Rgba(col.to_rgba_arr()));
+        let dims = self.0.dimensions();
+        if pos.x < dims.0 && pos.y < dims.1 {
+            self.0.put_pixel(pos.x, pos.y, Rgba(col.to_rgba_arr()));
+        }
         Ok(())
     }
 }

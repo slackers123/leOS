@@ -2,7 +2,8 @@ use corelib::types::{Float, Uint};
 use drawlib::{
     draw_target::DrawTarget,
     drawable::Drawable,
-    path::{CompletePathSeg, Path},
+    path::{path_drawable::isect_at, CompletePathSeg, Path},
+    text::get_char_path,
 };
 use imgsave::Qimg;
 use mathlib::{color::ColA, vectors::Vec2};
@@ -10,22 +11,24 @@ use mathlib::{color::ColA, vectors::Vec2};
 mod imgsave;
 
 fn main() {
-    // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
-    // let mut font = ttflib::load_ttf(&source);
+    let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
+    let font = ttflib::load_ttf(&source);
+
+    let src = "asdf";
+    let mut img = Qimg(image::ImageBuffer::new(1000, 1000));
+
+    for (i, c) in src.chars().enumerate() {
+        let mut path = get_char_path(c, &font);
+        path.pos.x = i as Float * 200.0;
+
+        path.draw(&mut img).unwrap();
+    }
+
+    // println!("{a_glyf:?}");
 
     // println!("font: {:?}", font.get_glyph('a'));
 
-    let mut img = Qimg(image::ImageBuffer::new(200, 200));
-
-    let mut path = Path::new();
-
-    path.move_to(Vec2::new(0.0, 0.0));
-    path.q_bezier_to(Vec2::new(50.0, 100.0), Vec2::new(100.0, 0.0));
-    path.line_to(Vec2::new(150.0, 100.0));
-    path.line_to(Vec2::new(100.0, 150.0));
-    path.close_path();
-
-    path.draw(&mut img).unwrap();
+    img.0.save("out.png").unwrap();
 
     // let rect = Rect2::new(
     //     Vec2::splat(100.0),
@@ -62,6 +65,5 @@ fn main() {
 
     // quad.draw(&mut img);
 
-    img.0.save("out.png").unwrap();
     // renderer.add_renderable(Renderable::Rect2(rect));
 }
