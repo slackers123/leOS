@@ -1,5 +1,10 @@
 use corelib::types::{Float, Uint};
-use mathlib::vectors::Vec2;
+use mathlib::{
+    bezier::{Bezier, CubicBezier, QuadraticBezier},
+    equations::{CubicEquation, Equation, LinearEquation, QuadraticEquation},
+    funcs::{approx_in_range, approx_in_range_01},
+    vectors::Vec2,
+};
 
 use crate::{drawable::Drawable, path::CompletePathSeg, rendererror::RenderResult};
 
@@ -27,21 +32,24 @@ impl Drawable for Path {
                             0
                         }
                         CompletePathSeg::LineTo(t) => {
-                            line_isect(t, last, Vec2::new(x as Float, y as Float), self.pos)
+                            line_isects(last, t, Vec2::new(x as Float, y as Float))
                         }
-                        CompletePathSeg::QBezierTo(p1, p2) => {
-                            qbezier_isect(last, p1, p2, Vec2::new(x as Float, y as Float), self.pos)
-                        }
-                        CompletePathSeg::ClosePath => line_isect(
-                            initial_point,
-                            last,
+                        CompletePathSeg::QBezierTo(p1, p2) => qbezier_isects(
+                            QuadraticBezier::new(last, p1, p2),
                             Vec2::new(x as Float, y as Float),
-                            self.pos,
                         ),
-                        _ => todo!("implement"),
+                        CompletePathSeg::CBezierTo(p1, p2, p3) => cbezier_isects(
+                            CubicBezier::new(last, p1, p2, p3),
+                            Vec2::new(x as Float, y as Float),
+                        ),
+                        CompletePathSeg::ClosePath => {
+                            line_isects(initial_point, last, Vec2::new(x as Float, y as Float))
+                        }
+                        _ => todo!("implement {seg:?}"),
                     };
                     last = seg.get_target();
                 }
+                // println!("{count}");
                 if count % 2 == 1 {
                     target.put_pixel(Vec2::new(x as Uint, y as Uint), self.col)?;
                 }
@@ -51,117 +59,110 @@ impl Drawable for Path {
     }
 }
 
-pub fn isect_at(path: &Path, p: Vec2<Float>) -> Uint {
-    let mut count = 0;
-    let segs = path.segs_iter();
-    let mut first = None;
-    let mut last = Vec2::ZERO;
-    let mut initial_point = Vec2::ZERO;
-    for seg in segs {
-        if first.is_none() {
-            first = Some(seg.clone());
-        }
-        count += match seg {
-            CompletePathSeg::MoveTo(t) => {
-                initial_point = t;
-                0
-            }
-            CompletePathSeg::LineTo(t) => line_isect(t, last, p, Vec2::ZERO),
-            CompletePathSeg::QBezierTo(p1, p2) => qbezier_isect(last, p1, p2, p, Vec2::ZERO),
-            CompletePathSeg::ClosePath => line_isect(initial_point, last, p, Vec2::ZERO),
-            _ => todo!("implement"),
-        };
-        last = seg.get_target();
+// pub fn isect_at(path: &Path, p: Vec2<Float>) -> Uint {
+//     let mut count = 0;
+//     let segs = path.segs_iter();
+//     let mut first = None;
+//     let mut last = Vec2::ZERO;
+//     let mut initial_point = Vec2::ZERO;
+//     for seg in segs {
+//         if first.is_none() {
+//             first = Some(seg.clone());
+//         }
+//         count += match seg {
+//             CompletePathSeg::MoveTo(t) => {
+//                 initial_point = t;
+//                 0
+//             }
+//             CompletePathSeg::LineTo(t) => line_isects(last, t, p),
+//             CompletePathSeg::QBezierTo(p1, p2) => qbezier_isects(QuadraticBezier, p, Vec2::ZERO),
+//             CompletePathSeg::ClosePath => line_isects(initial_point, last, p),
+//             _ => todo!("implement"),
+//         };
+//         last = seg.get_target();
+//     }
+//     count
+// }
+
+pub fn cbezier_isects(mut bezier: CubicBezier, test_point: Vec2<Float>) -> Uint {
+    let bezier_bb = bezier.bbox();
+    if !test_point_in_range(bezier_bb.min.y, bezier_bb.max.y, test_point) {
+        return 0;
     }
-    count
+
+    bezier.move_y(-test_point.y);
+    let CubicBezier { p0, p1, p2, p3 } = bezier;
+
+    let a = -p0.y + 3. * p1.y - 3. * p2.y + p3.y;
+    let b = 3. * p0.y - 6. * p1.y + 3. * p2.y;
+    let c = -3. * p0.y + 3. * p1.y;
+    let d = p0.y;
+
+    let equation = CubicEquation { a, b, c, d };
+
+    let roots = equation
+        .roots()
+        .into_iter()
+        .filter(|t| approx_in_range_01(t) && bezier.pos_from_t(*t).x < test_point.x)
+        .collect::<Vec<Float>>();
+
+    return roots.len() as Uint;
 }
 
-fn qbezier_isect(
-    p0: Vec2<Float>,
-    p1: Vec2<Float>,
-    p2: Vec2<Float>,
-    p: Vec2<Float>,
-    pos: Vec2<Float>,
-) -> Uint {
-    let p0 = p0 + pos;
-    let p1 = p1 + pos;
-    let p2 = p2 + pos;
-    let b = p.y;
-    let y_0 = p0.y;
-    let y_1 = p1.y;
-    let y_2 = p2.y;
-    if b == y_0 {
-        // FIXME: ths is not correct but it works to reduce atrifacts
+pub fn qbezier_isects(mut bezier: QuadraticBezier, test_point: Vec2<Float>) -> Uint {
+    let bezier_bb = bezier.bbox();
+    if !test_point_in_range(bezier_bb.min.y, bezier_bb.max.y, test_point) {
         return 0;
     }
-    let root_term = -2.0 * b * y_1 + y_0 * (b - y_2) + b * y_2 + y_1 * y_1;
-    if root_term < 0.0 {
-        return 0;
-    }
-    let denom = y_0 - 2.0 * y_1 + y_2;
-    if denom == 0.0 {
-        return 0;
-    }
-    let root_term_sqrt = root_term.sqrt();
-    let t = -(root_term_sqrt - y_0 + y_1) / (denom);
-    let t1 = (root_term_sqrt + y_0 - y_1) / (denom);
-    let mut count = if t > -0.0001 && t < 1.0001 {
-        let x = (1.0 - t) * (1.0 - t) * p0.x + 2.0 * (1.0 - t) * t * p1.x + t * t * p2.x;
-        if x < p.x + 0.0001 {
-            1
-        } else {
-            0
-        }
-    } else {
-        0
-    };
 
-    count += if t1 > -0.0001 && t1 < 1.0001 {
-        let x1 = (1.0 - t1) * (1.0 - t1) * p0.x + 2.0 * (1.0 - t1) * t1 * p1.x + t1 * t1 * p2.x;
-        if x1 < p.x + 0.0001 {
-            1
-        } else {
-            0
-        }
-    } else {
-        0
-    };
-    count
+    bezier.move_y(-test_point.y);
+
+    let a = bezier.p0.y - 2. * bezier.p1.y + bezier.p2.y;
+    let b = 2. * (bezier.p1.y - bezier.p0.y);
+    let c = bezier.p0.y;
+
+    let equation = QuadraticEquation { a, b, c };
+
+    // println!("{equation:?}");
+
+    let roots = equation
+        .roots()
+        .into_iter()
+        .filter(|t| approx_in_range_01(t) && bezier.pos_from_t(*t).x < test_point.x)
+        .collect::<Vec<Float>>();
+
+    // println!(
+    //     "{:?} {:?}",
+    //     equation.y_from_x(roots[0]),
+    //     equation.y_from_x(roots[1])
+    // );
+
+    return roots.len() as Uint;
 }
 
-fn line_isect(t: Vec2<Float>, last_point: Vec2<Float>, p: Vec2<Float>, pos: Vec2<Float>) -> Uint {
-    let t = t + pos;
-    let last_point = last_point + pos;
-    if last_point == t {
+fn line_isects(mut start: Vec2<Float>, mut end: Vec2<Float>, test_point: Vec2<Float>) -> Uint {
+    // println!("{test_point:?}");
+    if !test_point_in_range(start.y.min(end.y), start.y.max(end.y), test_point) {
         return 0;
     }
-    if p.y > t.y && p.y > last_point.y {
-        return 0;
-    }
-    if p.y < t.y && p.y < last_point.y {
-        return 0;
-    }
-    let d = last_point - t;
+    start.y -= test_point.y;
+    end.y -= test_point.y;
 
-    let k = d.y / d.x;
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let k = dx / dy;
+    let d = start.y - k * start.x;
 
-    if k == 0.0 {
-        // FIXME: ths is not correct but it works to reduce atrifacts
-        return 0;
+    let roots = LinearEquation { a: k, b: d }.roots();
+    if !roots.is_empty() {
+        let root = -roots[0];
+        if root < test_point.x {
+            return 1;
+        }
     }
-    let x_on_line = (p.y - t.y) / k + t.x;
+    return 0;
+}
 
-    if x_on_line < t.x && x_on_line < last_point.x {
-        return 0;
-    }
-
-    if x_on_line > t.x && x_on_line > last_point.x {
-        return 0;
-    }
-
-    if x_on_line > p.x {
-        return 0;
-    }
-
-    1
+fn test_point_in_range(y_min: Float, y_max: Float, test_point: Vec2<Float>) -> bool {
+    approx_in_range(&test_point.y, y_min, y_max)
 }

@@ -97,3 +97,9 @@ impl<T: AddAssign + Copy> ops::AddAssign for Vec2<T> {
         *self = *self + rhs;
     }
 }
+
+impl<T: SubAssign + Copy> ops::SubAssign for Vec2<T> {
+    fn sub_assign(&mut self, rhs: Vec2<T>) {
+        *self = *self - rhs;
+    }
+}

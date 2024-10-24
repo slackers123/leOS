@@ -14,3 +14,4 @@ mathlib = { path = "../leo-libs/mathlib" }
 ttflib = { path = "../leo-libs/ttflib" }
 corelib = { path = "../leo-libs/corelib" }
 # pnglib = { path = "../leo-libs/pnglib" }
+roots = "0.0.8"
