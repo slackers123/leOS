@@ -1,4 +1,4 @@
-use corelib::types::{Float, Uint};
+use corelib::types::Float;
 use mathlib::{aabb::AABB, color::ColA, vectors::Vec2};
 
 pub mod path_drawable;

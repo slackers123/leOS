@@ -1,39 +1,34 @@
-use corelib::types::Float;
-use drawlib::{
-    drawable::Drawable,
-    path::{
-        path_drawable::{cbezier_isects, qbezier_isects},
-        Path,
-    },
-    text::get_char_path,
-};
+use drawlib::{drawable::Drawable, path::Path};
 use imgsave::Qimg;
-use mathlib::{
-    bezier::{CubicBezier, QuadraticBezier},
-    vectors::Vec2,
-};
+use mathlib::vectors::Vec2;
 
 mod imgsave;
+// mod parsertest;
 
 fn main() {
+    let toks =
+        htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
+    println!("{toks:?}");
+
     // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
     // let font = ttflib::load_ttf(&source);
 
     // let src = "asdf";
-    let mut img = Qimg(image::ImageBuffer::new(100, 100));
+    // let mut img = Qimg(image::ImageBuffer::new(100, 100));
 
-    let mut p = Path::new();
-    p.move_to(Vec2::new(0., 0.));
-    p.c_bezier_to(
-        Vec2::new(0., 100.),
-        Vec2::new(100., 0.),
-        Vec2::new(100., 100.),
-    );
-    // p.line_to(Vec2::new(10., 10.));
+    // let mut p = Path::new();
+    // p.move_to(Vec2::new(0., 0.));
+    // p.c_bezier_to(
+    //     Vec2::new(0., 100.),
+    //     Vec2::new(100., 0.),
+    //     Vec2::new(100., 100.),
+    // );
+    // // p.line_to(Vec2::new(10., 10.));
+    // p.close_path();
 
-    p.draw(&mut img).unwrap();
+    // p.draw(&mut img).unwrap();
 
-    img.0.save("out.png").unwrap();
+    // img.0.save("out.png").unwrap();
 
     // println!(
     //     "{}",

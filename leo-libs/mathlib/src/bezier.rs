@@ -1,13 +1,18 @@
 use corelib::types::Float;
 
-use crate::{aabb::AABB, vectors::Vec2};
+use crate::{
+    aabb::AABB,
+    equations::{CubicEquation, QuadraticEquation},
+    funcs::approx_in_range_01,
+    horiz_line_intersect::HorizLineIntersect,
+    vectors::Vec2,
+};
 
 pub trait Bezier {
     fn pos_from_t(&self, t: Float) -> Vec2<Float>;
-    fn bbox(&self) -> AABB<Float>;
-    fn move_y(&mut self, y_off: Float);
 }
 
+#[derive(Debug, Clone)]
 pub struct QuadraticBezier {
     pub p0: Vec2<Float>,
     pub p1: Vec2<Float>,
@@ -25,6 +30,9 @@ impl Bezier for QuadraticBezier {
         // from: https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Quadratic_B%C3%A9zier_curves
         (1. - t) * ((1. - t) * self.p0 + t * self.p1) + t * ((1. - t) * self.p1 + t * self.p2)
     }
+}
+
+impl HorizLineIntersect<QuadraticEquation> for QuadraticBezier {
     fn bbox(&self) -> AABB<Float> {
         // TODO: use more optimal bounding box generation
         let mut aabb = AABB::default();
@@ -33,13 +41,29 @@ impl Bezier for QuadraticBezier {
         aabb.include_vec(&self.p2);
         aabb
     }
-    fn move_y(&mut self, y_off: Float) {
-        self.p0.y += y_off;
-        self.p1.y += y_off;
-        self.p2.y += y_off;
+
+    fn moved_y(&self, y_off: Float) -> Self {
+        let mut res = self.clone();
+        res.p0.y += y_off;
+        res.p1.y += y_off;
+        res.p2.y += y_off;
+        res
+    }
+
+    fn root_filter(&self, t: &Float, test_x: Float) -> bool {
+        approx_in_range_01(t) && self.pos_from_t(*t).x < test_x
+    }
+
+    fn get_equation(&self) -> QuadraticEquation {
+        let a = self.p0.y - 2. * self.p1.y + self.p2.y;
+        let b = 2. * (self.p1.y - self.p0.y);
+        let c = self.p0.y;
+
+        QuadraticEquation { a, b, c }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CubicBezier {
     pub p0: Vec2<Float>,
     pub p1: Vec2<Float>,
@@ -61,19 +85,38 @@ impl Bezier for CubicBezier {
             + 3. * (1. - t) * t.powi(2) * self.p2
             + t.powi(3) * self.p3
     }
+}
+
+impl HorizLineIntersect<CubicEquation> for CubicBezier {
     fn bbox(&self) -> AABB<Float> {
         // TODO: use more optimal bounding box generation
         let mut aabb = AABB::default();
         aabb.include_vec(&self.p0);
         aabb.include_vec(&self.p1);
         aabb.include_vec(&self.p2);
-        aabb.include_vec(&self.p3);
         aabb
     }
-    fn move_y(&mut self, y_off: Float) {
-        self.p0.y += y_off;
-        self.p1.y += y_off;
-        self.p2.y += y_off;
-        self.p3.y += y_off;
+
+    fn moved_y(&self, y_off: Float) -> Self {
+        let mut res = self.clone();
+        res.p0.y += y_off;
+        res.p1.y += y_off;
+        res.p2.y += y_off;
+        res.p3.y += y_off;
+        res
+    }
+
+    fn root_filter(&self, t: &Float, test_x: Float) -> bool {
+        approx_in_range_01(t) && self.pos_from_t(*t).x < test_x
+    }
+
+    fn get_equation(&self) -> CubicEquation {
+        let CubicBezier { p0, p1, p2, p3 } = self;
+        let a = -p0.y + 3. * p1.y - 3. * p2.y + p3.y;
+        let b = 3. * p0.y - 6. * p1.y + 3. * p2.y;
+        let c = -3. * p0.y + 3. * p1.y;
+        let d = p0.y;
+
+        CubicEquation { a, b, c, d }
     }
 }
