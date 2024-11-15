@@ -6,9 +6,15 @@ mod imgsave;
 // mod parsertest;
 
 fn main() {
-    let toks =
-        htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
-    println!("{toks:?}");
+    // let toks =
+    //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
+    // println!("{toks:?}");
+
+    // regexlib::test_epsilon_state_machine();
+
+    let regex_sm = regexlib::new_regex_state_machine("a(abc)*|def");
+    let res = regexlib::validate_regex(regex_sm, "aabcabc");
+    assert!(res);
 
     // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
     // let font = ttflib::load_ttf(&source);

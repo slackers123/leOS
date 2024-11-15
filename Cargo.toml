@@ -6,7 +6,7 @@ members = [
     "leo-applications/leo-browser",
     "leo-libs/corelib",
     "leo-libs/drawlib", "leo-libs/htmllib",
-    "leo-libs/mathlib", "leo-libs/parserlib",
+    "leo-libs/mathlib", "leo-libs/parserlib", "leo-libs/regexlib",
     "leo-libs/ttflib",
     "leos-kernel",
     "leos-run",
