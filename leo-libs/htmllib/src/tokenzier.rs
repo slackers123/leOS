@@ -1,17 +1,12 @@
-use std::cell::RefCell;
-
-pub struct Node;
-
 pub struct Tokenizer<'a> {
     src: &'a [char],
     pos: usize,
     state: TokenizerState,
     return_state: TokenizerState,
-    current_tag_token: RefCell<TagToken>,
-    current_comment_token: RefCell<CommentToken>,
-    current_doctype_token: RefCell<DOCTYPEToken>,
+    current_tag_token: TagToken,
+    current_comment_token: CommentToken,
+    current_doctype_token: DOCTYPEToken,
     temporary_buffer: String,
-    stack_of_open_elements: Vec<Node>,
 }
 impl<'a> Tokenizer<'a> {
     pub fn new(src: &'a [char]) -> Tokenizer<'a> {
@@ -20,11 +15,10 @@ impl<'a> Tokenizer<'a> {
             pos: 0,
             state: TokenizerState::DataState,
             return_state: TokenizerState::DataState,
-            current_tag_token: RefCell::new(TagToken::default()),
-            current_comment_token: RefCell::new(CommentToken::default()),
-            current_doctype_token: RefCell::new(DOCTYPEToken::default()),
+            current_tag_token: TagToken::default(),
+            current_comment_token: CommentToken::default(),
+            current_doctype_token: DOCTYPEToken::default(),
             temporary_buffer: String::new(),
-            stack_of_open_elements: Vec::new(),
         }
     }
     pub fn cc(&self) -> char {
@@ -42,19 +36,15 @@ impl<'a> Tokenizer<'a> {
     }
 
     pub fn append_char_to_tag_token_name(&mut self, c: char) {
-        self.current_tag_token.borrow_mut().name.push(c);
+        self.current_tag_token.name.push(c);
     }
 
     fn new_attrib_in_tag_token(&mut self, name: String, value: String) {
-        self.current_tag_token
-            .borrow_mut()
-            .attributes
-            .push((name, value));
+        self.current_tag_token.attributes.push((name, value));
     }
 
     fn append_char_to_current_attribute_name(&mut self, c: char) {
         self.current_tag_token
-            .borrow_mut()
             .attributes
             .last_mut()
             .expect("expected attributes to be at leas of length one before changing names")
@@ -64,7 +54,6 @@ impl<'a> Tokenizer<'a> {
 
     fn append_char_to_current_attribute_value(&mut self, c: char) {
         self.current_tag_token
-            .borrow_mut()
             .attributes
             .last_mut()
             .expect("expected attributes to be at leas of length one before changing names")
@@ -72,20 +61,19 @@ impl<'a> Tokenizer<'a> {
             .push(c);
     }
     fn set_self_closing_flag_of_current_tag_token(&mut self, flag: bool) {
-        self.current_tag_token.borrow_mut().self_closing = flag;
+        self.current_tag_token.self_closing = flag;
     }
 
     fn append_char_to_comment_data(&mut self, c: char) {
-        self.current_comment_token.borrow_mut().0.push(c);
+        self.current_comment_token.0.push(c);
     }
 
     fn append_char_to_doctype_token_name(&mut self, c: char) {
-        self.current_doctype_token.borrow_mut().name.push(c);
+        self.current_doctype_token.name.push(c);
     }
 
     fn append_char_to_doctype_token_public_identifier(&mut self, c: char) {
         self.current_doctype_token
-            .borrow_mut()
             .public_identifier
             .as_mut()
             .expect("public_identifier of current doctype token should not be none")
@@ -94,47 +82,15 @@ impl<'a> Tokenizer<'a> {
 
     fn append_char_to_doctype_token_system_identifier(&mut self, c: char) {
         self.current_doctype_token
-            .borrow_mut()
             .system_identifier
             .as_mut()
             .expect("system_identifier of current doctype token should not be none")
             .push(c);
     }
-
-    pub fn tokens(&mut self) -> Vec<Token> {
-        let res = RefCell::new(Vec::new());
-
-        let emit = |t: Token| {
-            res.borrow_mut().push(t);
-        };
-
-        let emitc = |c: char| {
-            res.borrow_mut().push(Token::Character(c));
-        };
-
-        let emitct = |src: &Tokenizer| {
-            res.borrow_mut()
-                .push(Token::Tag(src.current_tag_token.borrow().clone()));
-        };
-
-        let emitcc = |src: &Tokenizer| {
-            res.borrow_mut()
-                .push(Token::Comment(src.current_comment_token.borrow().clone()));
-        };
-
-        let emitcdt = |src: &Tokenizer| {
-            res.borrow_mut()
-                .push(Token::DOCTYPE(src.current_doctype_token.borrow().clone()));
-        };
-
-        let flush_code_points_consumed_as_a_character_reference_as_tokens =
-            |src: &mut Tokenizer| {
-                for c in src.temporary_buffer.chars() {
-                    emitc(c);
-                }
-                src.temporary_buffer = String::new();
-            };
-
+}
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = Vec<Token>;
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
             use TokenizerState::*;
             match self.state {
@@ -149,13 +105,12 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc(self.cc());
+                        return Some(vec![Token::Character(self.cc())]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rcdata-state
                 RCDATAState => match self.nc() {
@@ -168,13 +123,12 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rawtext-state
                 RAWTEXTState => match self.nc() {
@@ -183,13 +137,12 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-state
                 ScriptDataState => match self.nc() {
@@ -198,25 +151,23 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#plaintext-state
                 PLAINTEXTState => match self.nc() {
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
                 TagOpenState => match self.nc() {
@@ -224,32 +175,31 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{002F}') => self.state = EndTagOpenState,
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
-                        self.current_tag_token = RefCell::new(TagToken {
+                        self.current_tag_token = TagToken {
                             start: true,
                             ..Default::default()
-                        });
+                        };
                         self.reconsume_in(TagNameState);
                     }
                     Some('\u{003F}') => {
                         // ERROR
-                        self.current_comment_token = RefCell::new(CommentToken(String::new()));
+                        self.current_comment_token = CommentToken(String::new());
                         self.reconsume_in(BogusCommentState);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         // ERROR
                         self.reconsume_in(DataState);
-                        emitc('\u{003C}');
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#end-tag-open-state
                 EndTagOpenState => match self.nc() {
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
-                        self.current_tag_token = RefCell::new(TagToken::default());
+                        self.current_tag_token = TagToken::default();
                         self.reconsume_in(TagNameState);
                     }
                     Some('\u{003E}') => {
@@ -257,12 +207,11 @@ impl<'a> Tokenizer<'a> {
                         self.state = DataState;
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_comment_token = RefCell::new(CommentToken(String::new()));
+                        self.current_comment_token = CommentToken(String::new());
                         self.reconsume_in(BogusCommentState);
                     }
                 },
@@ -274,7 +223,7 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{002F}') => self.state = SelfClosingStartTagState,
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitct(&self);
+                        return Some(vec![Token::Tag(self.current_tag_token.clone())]);
                     }
                     Some('\u{0041}'..='\u{005A}') => {
                         self.append_char_to_tag_token_name(self.cc().to_ascii_lowercase());
@@ -284,8 +233,7 @@ impl<'a> Tokenizer<'a> {
                         self.append_char_to_tag_token_name('\u{FFFD}');
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         self.append_char_to_tag_token_name(self.cc());
@@ -299,20 +247,22 @@ impl<'a> Tokenizer<'a> {
                     }
                     _ => {
                         self.reconsume_in(RCDATAState);
-                        emitc('\u{003C}');
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rcdata-end-tag-open-state
                 RCDATAEndTagOpenState => match self.nc() {
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
-                        self.current_tag_token = RefCell::new(TagToken::default());
+                        self.current_tag_token = TagToken::default();
                         self.reconsume_in(RCDATAEndTagNameState);
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
                         self.reconsume_in(RCDATAState);
+                        return Some(vec![
+                            Token::Character('\u{003C}'),
+                            Token::Character('\u{002F}'),
+                        ]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rcdata-end-tag-name-state
@@ -353,12 +303,13 @@ impl<'a> Tokenizer<'a> {
                         self.temporary_buffer.push(self.cc());
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
+                        let mut res =
+                            vec![Token::Character('\u{003C}'), Token::Character('\u{002F}')];
                         for c in self.temporary_buffer.chars() {
-                            emitc(c);
+                            res.push(Token::Character(c));
                         }
                         self.reconsume_in(RCDATAState);
+                        return Some(res);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rawtext-less-than-sign-state
@@ -368,21 +319,23 @@ impl<'a> Tokenizer<'a> {
                         self.state = RAWTEXTEndTagOpenState
                     }
                     _ => {
-                        emitc('\u{003C}');
                         self.reconsume_in(RAWTEXTState);
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rawtext-end-tag-open-state
                 RAWTEXTEndTagOpenState => match self.nc() {
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
-                        self.current_tag_token = RefCell::new(TagToken::default());
+                        self.current_tag_token = TagToken::default();
                         self.reconsume_in(RAWTEXTEndTagNameState);
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
                         self.reconsume_in(RAWTEXTState);
+                        return Some(vec![
+                            Token::Character('\u{003C}'),
+                            Token::Character('\u{002F}'),
+                        ]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#rawtext-end-tag-name-state
@@ -423,12 +376,13 @@ impl<'a> Tokenizer<'a> {
                         self.temporary_buffer.push(self.cc());
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
+                        let mut res =
+                            vec![Token::Character('\u{003C}'), Token::Character('\u{002F}')];
                         for c in self.temporary_buffer.chars() {
-                            emitc(c);
+                            res.push(Token::Character(c));
                         }
                         self.reconsume_in(RAWTEXTState);
+                        return Some(res);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-less-than-sign-state
@@ -439,25 +393,29 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0021}') => {
                         self.state = ScriptDataEscapeStartState;
-                        emitc('\u{003C}');
-                        emitc('\u{0021}');
+                        return Some(vec![
+                            Token::Character('\u{003C}'),
+                            Token::Character('\u{0021}'),
+                        ]);
                     }
                     _ => {
-                        emitc('\u{003C}');
                         self.reconsume_in(ScriptDataState);
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-open-state
                 ScriptDataEndTagOpenState => match self.nc() {
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
-                        self.current_tag_token = RefCell::new(TagToken::default());
+                        self.current_tag_token = TagToken::default();
                         self.reconsume_in(ScriptDataEndTagNameState);
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
-                        self.reconsume_in(ScriptDataState)
+                        self.reconsume_in(ScriptDataState);
+                        return Some(vec![
+                            Token::Character('\u{003C}'),
+                            Token::Character('\u{002F}'),
+                        ]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-name-state
@@ -498,19 +456,20 @@ impl<'a> Tokenizer<'a> {
                         self.temporary_buffer.push(self.cc());
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
+                        let mut res =
+                            vec![Token::Character('\u{003C}'), Token::Character('\u{002F}')];
                         for c in self.temporary_buffer.chars() {
-                            emitc(c);
+                            res.push(Token::Character(c));
                         }
                         self.reconsume_in(ScriptDataState);
+                        return Some(res);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-escape-start-state
                 ScriptDataEscapeStartState => match self.nc() {
                     Some('\u{002D}') => {
                         self.state = ScriptDataEscapeStartDashState;
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     _ => {
                         self.reconsume_in(ScriptDataState);
@@ -520,7 +479,7 @@ impl<'a> Tokenizer<'a> {
                 ScriptDataEscapeStartDashState => match self.nc() {
                     Some('\u{002D}') => {
                         self.state = ScriptDataEscapedDashDashState;
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     _ => {
                         self.reconsume_in(ScriptDataState);
@@ -530,69 +489,66 @@ impl<'a> Tokenizer<'a> {
                 ScriptDataEscapedState => match self.nc() {
                     Some('\u{002D}') => {
                         self.state = ScriptDataEscapedDashState;
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     Some('\u{003C}') => {
                         self.state = ScriptDataEscapedLessThanSignState;
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
-                        emitc(c);
+                        return Some(vec![Token::Character(c)]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-escaped-dash-state
                 ScriptDataEscapedDashState => match self.nc() {
                     Some('\u{002D}') => {
                         self.state = ScriptDataEscapedDashDashState;
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     Some('\u{003C}') => {
                         self.state = ScriptDataEscapedLessThanSignState;
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.state = ScriptDataEscapedState;
-                        emitc(c);
+                        return Some(vec![Token::Character(c)]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-escaped-dash-dash-state
                 ScriptDataEscapedDashDashState => match self.nc() {
                     Some('\u{002D}') => {
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     Some('\u{003C}') => {
                         self.state = ScriptDataEscapedLessThanSignState;
                     }
                     Some('\u{003E}') => {
                         self.state = ScriptDataState;
-                        emitc('\u{003E}');
+                        return Some(vec![Token::Character('\u{003E}')]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
                         self.state = ScriptDataEscapedState;
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.state = ScriptDataEscapedState;
-                        emitc(c);
+                        return Some(vec![Token::Character(c)]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-escaped-less-than-sign-state
@@ -604,25 +560,27 @@ impl<'a> Tokenizer<'a> {
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
                         self.temporary_buffer = String::new();
-                        emitc('\u{003C}');
                         self.reconsume_in(ScriptDataDoubleEscapeStartState);
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                     _ => {
-                        emitc('\u{003C}');
                         self.reconsume_in(ScriptDataEscapedState);
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-escaped-end-tag-open-state
                 ScriptDataEscapedEndTagOpenState => match self.nc() {
                     // ascii alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}') => {
-                        self.current_tag_token = RefCell::new(TagToken::default());
+                        self.current_tag_token = TagToken::default();
                         self.reconsume_in(ScriptDataEscapedEndTagNameState);
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
                         self.reconsume_in(ScriptDataEscapedState);
+                        return Some(vec![
+                            Token::Character('\u{003C}'),
+                            Token::Character('\u{002F}'),
+                        ]);
                     }
                 },
                 ScriptDataEscapedEndTagNameState => match self.nc() {
@@ -662,12 +620,13 @@ impl<'a> Tokenizer<'a> {
                         self.temporary_buffer.push(self.cc());
                     }
                     _ => {
-                        emitc('\u{003C}');
-                        emitc('\u{002F}');
+                        let mut res =
+                            vec![Token::Character('\u{003C}'), Token::Character('\u{002F}')];
                         for c in self.temporary_buffer.chars() {
-                            emitc(c);
+                            res.push(Token::Character(c));
                         }
                         self.reconsume_in(ScriptDataEscapedState);
+                        return Some(res);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-double-escape-start-state
@@ -679,7 +638,7 @@ impl<'a> Tokenizer<'a> {
                             self.state = ScriptDataDoubleEscapedState;
                         } else {
                             self.state = ScriptDataEscapedState;
-                            emitc(self.cc());
+                            return Some(vec![Token::Character(self.cc())]);
                         }
                     }
                     Some('\u{0041}'..='\u{005A}') => {
@@ -698,74 +657,71 @@ impl<'a> Tokenizer<'a> {
                 ScriptDataDoubleEscapedState => match self.nc() {
                     Some('\u{002D}') => {
                         self.state = ScriptDataDoubleEscapedDashState;
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     Some('\u{003C}') => {
                         self.state = ScriptDataDoubleEscapedLessThanSignState;
-                        emitc('\u{003C}');
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-double-escaped-dash-state
                 ScriptDataDoubleEscapedDashState => match self.nc() {
                     Some('\u{002D}') => {
                         self.state = ScriptDataDoubleEscapedDashDashState;
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     Some('\u{003C}') => {
                         self.state = ScriptDataDoubleEscapedLessThanSignState;
-                        emitc('\u{003C}');
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
                         self.state = ScriptDataDoubleEscapedState;
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.state = ScriptDataDoubleEscapedState;
-                        emitc(c);
+                        return Some(vec![Token::Character(c)]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-double-escaped-dash-dash-state
                 ScriptDataDoubleEscapedDashDashState => match self.nc() {
                     Some('\u{002D}') => {
-                        emitc('\u{002D}');
+                        return Some(vec![Token::Character('\u{002D}')]);
                     }
                     Some('\u{003C}') => {
                         self.state = ScriptDataDoubleEscapedLessThanSignState;
-                        emitc('\u{003C}');
+                        return Some(vec![Token::Character('\u{003C}')]);
                     }
                     Some('\u{003E}') => {
                         self.state = ScriptDataState;
-                        emitc('\u{003E}');
+                        return Some(vec![Token::Character('\u{003E}')]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
                         self.state = ScriptDataDoubleEscapedState;
-                        emitc('\u{FFFD}');
+                        return Some(vec![Token::Character('\u{FFFD}')]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.state = ScriptDataDoubleEscapedState;
-                        emitc(c);
+                        return Some(vec![Token::Character(c)]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#script-data-double-escaped-less-than-sign-state
@@ -773,7 +729,7 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{002F}') => {
                         self.temporary_buffer = String::new();
                         self.state = ScriptDataDoubleEscapeEndState;
-                        emitc('\u{002F}');
+                        return Some(vec![Token::Character('\u{002F}')]);
                     }
                     _ => {
                         self.reconsume_in(ScriptDataDoubleEscapedState);
@@ -788,16 +744,16 @@ impl<'a> Tokenizer<'a> {
                             self.state = ScriptDataEscapedState;
                         } else {
                             self.state = ScriptDataDoubleEscapedState;
-                            emitc(self.cc());
+                            return Some(vec![Token::Character(self.cc())]);
                         }
                     }
                     Some('\u{0041}'..='\u{005A}') => {
                         self.temporary_buffer.push(self.cc().to_ascii_lowercase());
-                        emitc(self.cc())
+                        return Some(vec![Token::Character(self.cc())]);
                     }
                     Some('\u{0061}'..='\u{007A}') => {
                         self.temporary_buffer.push(self.cc());
-                        emitc(self.cc())
+                        return Some(vec![Token::Character(self.cc())]);
                     }
                     _ => {
                         self.reconsume_in(ScriptDataDoubleEscapedState);
@@ -856,12 +812,11 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitct(&self)
+                        return Some(vec![Token::Tag(self.current_tag_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         self.new_attrib_in_tag_token(String::new(), String::new());
@@ -880,7 +835,7 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{003E}') => {
                         // ERROR
                         self.state = DataState;
-                        emitct(&self);
+                        return Some(vec![Token::Tag(self.current_tag_token.clone())]);
                     }
                     _ => {
                         self.reconsume_in(AttributeValueUnquotedState);
@@ -901,8 +856,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.append_char_to_current_attribute_value(c);
@@ -923,8 +877,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.append_char_to_current_attribute_value(c);
@@ -941,7 +894,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitct(&self);
+                        return Some(vec![Token::Tag(self.current_tag_token.clone())]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
@@ -953,8 +906,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.append_char_to_current_attribute_value(c);
@@ -970,12 +922,11 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitct(&self);
+                        return Some(vec![Token::Tag(self.current_tag_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         // ERROR
@@ -987,12 +938,11 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{003E}') => {
                         self.set_self_closing_flag_of_current_tag_token(true);
                         self.state = DataState;
-                        emitct(&self);
+                        return Some(vec![Token::Tag(self.current_tag_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         // ERROR
@@ -1003,12 +953,13 @@ impl<'a> Tokenizer<'a> {
                 BogusCommentState => match self.nc() {
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcc(&self);
+                        return Some(vec![Token::Comment(self.current_comment_token.clone())]);
                     }
                     None => {
-                        emitcc(&self);
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::Comment(self.current_comment_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
@@ -1023,14 +974,13 @@ impl<'a> Tokenizer<'a> {
                     let anything_else = |src: &mut Tokenizer| {
                         // ERROR
                         src.pos -= 1;
-                        src.current_comment_token = RefCell::new(CommentToken::default());
+                        src.current_comment_token = CommentToken::default();
                         src.state = BogusCommentState;
                     };
                     match self.nc() {
                         Some('\u{002D}') => {
                             if self.nc() == Some('\u{002D}') {
-                                self.current_comment_token =
-                                    RefCell::new(CommentToken(String::new()));
+                                self.current_comment_token = CommentToken(String::new());
                                 self.state = CommentStartState;
                             } else {
                                 anything_else(self);
@@ -1058,8 +1008,7 @@ impl<'a> Tokenizer<'a> {
                                 self.state = CDATASectionState;
                             } else {
                                 // ERROR
-                                self.current_comment_token =
-                                    RefCell::new(CommentToken("[CDATA[".to_owned()));
+                                self.current_comment_token = CommentToken("[CDATA[".to_owned());
                             }
                         }
                         _ => {
@@ -1075,7 +1024,7 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{003E}') => {
                         // ERROR
                         self.state = DataState;
-                        emitcc(&self);
+                        return Some(vec![Token::Comment(self.current_comment_token.clone())]);
                     }
                     _ => {
                         self.reconsume_in(CommentState);
@@ -1089,12 +1038,11 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{003E}') => {
                         // ERROR
                         self.state = DataState;
-                        emitcc(&self);
+                        return Some(vec![Token::Comment(self.current_comment_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         self.append_char_to_comment_data('\u{002D}');
@@ -1116,8 +1064,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(c) => {
                         self.append_char_to_comment_data(c);
@@ -1171,8 +1118,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     Some(_) => {
                         self.append_char_to_comment_data('\u{002D}');
@@ -1183,7 +1129,7 @@ impl<'a> Tokenizer<'a> {
                 CommentEndState => match self.nc() {
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcc(&self);
+                        return Some(vec![Token::Comment(self.current_comment_token.clone())]);
                     }
                     Some('\u{0021}') => {
                         self.state = CommentEndBangState;
@@ -1193,8 +1139,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     _ => {
                         self.append_char_to_comment_data('\u{002D}');
@@ -1213,12 +1158,11 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{003E}') => {
                         // ERROR
                         self.state = DataState;
-                        emitcc(&self);
+                        return Some(vec![Token::Comment(self.current_comment_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
                     _ => {
                         self.append_char_to_comment_data('\u{002D}');
@@ -1237,15 +1181,15 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token = RefCell::new(DOCTYPEToken {
+                        self.current_doctype_token = DOCTYPEToken {
                             force_quirks: true,
                             ..Default::default()
-                        });
+                        };
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     _ => {
                         // ERROR
@@ -1257,46 +1201,46 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{0009}' | '\u{000A}' | '\u{000C}' | '\u{0020}') => {}
                     // ascii upper alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}') => {
-                        self.current_doctype_token = RefCell::new(DOCTYPEToken {
+                        self.current_doctype_token = DOCTYPEToken {
                             name: self.cc().to_string(),
                             ..Default::default()
-                        });
+                        };
                         self.state = DOCTYPENameState;
                     }
                     Some('\u{0000}') => {
                         // ERROR
-                        self.current_doctype_token = RefCell::new(DOCTYPEToken {
+                        self.current_doctype_token = DOCTYPEToken {
                             name: '\u{FFFD}'.to_string(),
                             ..Default::default()
-                        });
+                        };
                         self.state = DOCTYPENameState;
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token = RefCell::new(DOCTYPEToken {
+                        self.current_doctype_token = DOCTYPEToken {
                             force_quirks: true,
                             ..Default::default()
-                        });
+                        };
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token = RefCell::new(DOCTYPEToken {
+                        self.current_doctype_token = DOCTYPEToken {
                             force_quirks: true,
                             ..Default::default()
-                        });
+                        };
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
-                        self.current_doctype_token = RefCell::new(DOCTYPEToken {
+                        self.current_doctype_token = DOCTYPEToken {
                             name: c.to_string(),
                             ..Default::default()
-                        });
+                        };
                         self.state = DOCTYPENameState;
                     }
                 },
@@ -1307,7 +1251,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     // ascii upper alpha code point: https://infra.spec.whatwg.org/#code-points
                     Some('\u{0041}'..='\u{005A}') => {
@@ -1319,12 +1263,12 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
                         self.append_char_to_doctype_token_name(c);
@@ -1335,16 +1279,16 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{0009}' | '\u{000A}' | '\u{000C}' | '\u{0020}') => {}
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
                         let next5: Vec<_> = (0..5).map(|_| self.nc()).collect();
@@ -1353,7 +1297,6 @@ impl<'a> Tokenizer<'a> {
                             for (c1, c2) in "UBLIC".chars().zip(next5.clone()) {
                                 if c2.is_none() || c1 != c2.unwrap().to_ascii_uppercase() {
                                     public_flag = false;
-                                    break;
                                 }
                             }
                         }
@@ -1367,7 +1310,6 @@ impl<'a> Tokenizer<'a> {
                             for (c1, c2) in "YSTEM".chars().zip(next5) {
                                 if c2.is_none() || c1 != c2.unwrap().to_ascii_uppercase() {
                                     system_flag = false;
-                                    break;
                                 }
                             }
                         }
@@ -1377,7 +1319,7 @@ impl<'a> Tokenizer<'a> {
                         }
                         // did not exit erlier
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.pos -= 5;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
@@ -1389,34 +1331,32 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0022}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().public_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.public_identifier = Some(String::new());
                         self.state = DOCTYPEPublicIdentifierDoubleQuotedState;
                     }
                     Some('\u{0027}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().public_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.public_identifier = Some(String::new());
                         self.state = DOCTYPEPublicIdentifierSingleQuotedState;
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
                 },
@@ -1424,33 +1364,31 @@ impl<'a> Tokenizer<'a> {
                 BeforeDOCTYPEPublicIdentifierState => match self.nc() {
                     Some('\u{0009}' | '\u{000A}' | '\u{000C}' | '\u{0020}') => {}
                     Some('\u{0022}') => {
-                        self.current_doctype_token.borrow_mut().public_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.public_identifier = Some(String::new());
                         self.state = DOCTYPEPublicIdentifierDoubleQuotedState;
                     }
                     Some('\u{0027}') => {
-                        self.current_doctype_token.borrow_mut().public_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.public_identifier = Some(String::new());
                         self.state = DOCTYPEPublicIdentifierSingleQuotedState;
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
                 },
@@ -1465,18 +1403,18 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
                         self.append_char_to_doctype_token_public_identifier(c);
@@ -1493,18 +1431,18 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
                         self.append_char_to_doctype_token_public_identifier(c);
@@ -1517,32 +1455,30 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     Some('\u{0022}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierDoubleQuotedState;
                     }
                     Some('\u{0027}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierSingleQuotedState;
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
                 },
@@ -1551,30 +1487,28 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{0009}' | '\u{000A}' | '\u{000C}' | '\u{0020}') => {}
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     Some('\u{0022}') => {
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierDoubleQuotedState;
                     }
                     Some('\u{0027}') => {
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierSingleQuotedState;
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
                 },
@@ -1585,34 +1519,32 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{0022}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierDoubleQuotedState;
                     }
                     Some('\u{0027}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierSingleQuotedState;
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
                 },
@@ -1620,33 +1552,31 @@ impl<'a> Tokenizer<'a> {
                 BeforeDOCTYPESystemIdentifierState => match self.nc() {
                     Some('\u{0009}' | '\u{000A}' | '\u{000C}' | '\u{0020}') => {}
                     Some('\u{0022}') => {
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierDoubleQuotedState;
                     }
                     Some('\u{0027}') => {
-                        self.current_doctype_token.borrow_mut().system_identifier =
-                            Some(String::new());
+                        self.current_doctype_token.system_identifier = Some(String::new());
                         self.state = DOCTYPESystemIdentifierSingleQuotedState;
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.reconsume_in(BogusDOCTYPEState);
                     }
                 },
@@ -1661,18 +1591,18 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
                         self.append_char_to_doctype_token_system_identifier(c);
@@ -1689,18 +1619,18 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('\u{003E}') => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(c) => {
                         self.append_char_to_doctype_token_system_identifier(c);
@@ -1711,16 +1641,16 @@ impl<'a> Tokenizer<'a> {
                     Some('\u{0009}' | '\u{000A}' | '\u{000C}' | '\u{0020}') => {}
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     None => {
                         // ERROR
-                        self.current_doctype_token.borrow_mut().force_quirks = true;
+                        self.current_doctype_token.force_quirks = true;
 
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {
                         // ERROR
@@ -1731,16 +1661,16 @@ impl<'a> Tokenizer<'a> {
                 BogusDOCTYPEState => match self.nc() {
                     Some('\u{003E}') => {
                         self.state = DataState;
-                        emitcdt(&self);
+                        return Some(vec![Token::DOCTYPE(self.current_doctype_token.clone())]);
                     }
                     Some('\u{0000}') => {
                         // ERROR
                     }
                     None => {
-                        emitcdt(&self);
-
-                        emit(Token::EOF);
-                        break;
+                        return Some(vec![
+                            Token::DOCTYPE(self.current_doctype_token.clone()),
+                            Token::EOF,
+                        ]);
                     }
                     Some(_) => {}
                 },
@@ -1751,10 +1681,9 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         // ERROR
-                        emit(Token::EOF);
-                        break;
+                        return None;
                     }
-                    Some(c) => emitc(c),
+                    Some(c) => return Some(vec![Token::Character(c)]),
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#cdata-section-bracket-state
                 CDATASectionBracketState => match self.nc() {
@@ -1762,22 +1691,25 @@ impl<'a> Tokenizer<'a> {
                         self.state = CDATASectionEndState;
                     }
                     _ => {
-                        emitc('\u{005D}');
                         self.reconsume_in(CDATASectionState);
+                        return Some(vec![Token::Character('\u{005D}')]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#cdata-section-end-state
                 CDATASectionEndState => match self.nc() {
                     Some('\u{005D}') => {
-                        emitc('\u{005D}');
+                        return Some(vec![Token::Character('\u{005D}')]);
                     }
                     Some('\u{003E}') => {
                         self.state = DataState;
                     }
                     _ => {
-                        emitc('\u{005D}');
-                        emitc('\u{005D}');
                         self.reconsume_in(CDATASectionState);
+
+                        return Some(vec![
+                            Token::Character('\u{005D}'),
+                            Token::Character('\u{005D}'),
+                        ]);
                     }
                 },
                 // https://html.spec.whatwg.org/multipage/parsing.html#character-reference-state
@@ -1798,7 +1730,10 @@ impl<'a> Tokenizer<'a> {
                             self.state = NumericCharacterReferenceState;
                         }
                         _ => {
-                            flush_code_points_consumed_as_a_character_reference_as_tokens(self);
+                            for c in self.temporary_buffer.chars() {
+                                return Some(vec![Token::Character(c)]);
+                            }
+                            self.temporary_buffer = String::new();
                             self.reconsume_in(self.return_state);
                         }
                     }
@@ -1837,7 +1772,6 @@ impl<'a> Tokenizer<'a> {
                 }
             }
         }
-        res.into_inner()
     }
 }
 
@@ -1848,6 +1782,44 @@ pub enum Token {
     Tag(TagToken),
     Comment(CommentToken),
     DOCTYPE(DOCTYPEToken),
+}
+
+impl Token {
+    #[inline]
+    pub fn is_eof(&self) -> bool {
+        match self {
+            Token::EOF => true,
+            _ => false,
+        }
+    }
+    #[inline]
+    pub fn is_character(&self) -> bool {
+        match self {
+            Token::Character(_) => true,
+            _ => false,
+        }
+    }
+    #[inline]
+    pub fn is_tag(&self) -> bool {
+        match self {
+            Token::Tag(_) => true,
+            _ => false,
+        }
+    }
+    #[inline]
+    pub fn is_start_tag(&self) -> bool {
+        match self {
+            Token::Tag(t) => t.start,
+            _ => false,
+        }
+    }
+    #[inline]
+    pub fn is_tag_with_name(&self, name: &str) -> bool {
+        match self {
+            Token::Tag(t) => t.name == name,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
