@@ -10,8 +10,6 @@ fn main() {
     //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
 
-    // regexlib::test_epsilon_state_machine();
-
     let regex_sm =
         regexlib::new_regex_state_machine(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+");
     let res = regexlib::validate_regex(regex_sm, "s@g.t");

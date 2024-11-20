@@ -26,8 +26,8 @@ impl TransitionCondition {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BracketExpr {
-    inverted: bool,
-    inner_be: Vec<InnerBrackExpr>,
+    pub inverted: bool,
+    pub inner_be: Vec<InnerBrackExpr>,
 }
 
 impl BracketExpr {
@@ -93,6 +93,7 @@ pub struct RunningEpsilonNFA<'a> {
 impl<'a> RunningEpsilonNFA<'a> {
     pub fn new(state_machine: &'a EpsilonNFA) -> Self {
         let mut new_states = HashMap::new();
+        new_states.insert(state_machine.start, ());
         for transition in &state_machine.transitions[state_machine.start] {
             if transition.1.is_none() {
                 Self::get_new_states(&state_machine, transition.0, &mut new_states);
@@ -113,11 +114,14 @@ impl<'a> RunningEpsilonNFA<'a> {
     }
 
     pub fn run_iteration(&mut self, c: char, is_start: bool, is_end: bool) {
+        println!("{:?}", self.current_states);
         let mut new_states = HashMap::new();
         for state in &self.current_states {
             for transition in &self.state_machine.transitions[*state] {
                 if transition.1.is_none() && !self.current_states.contains(&transition.0)
                     || transition.1.is_some()
+                    // FIXME: moving on to the next char depends on e.g. if the condition is "is_start"
+                    //        because other wise the first character will be skipped
                         && transition.1.as_ref().unwrap().check(c, is_start, is_end)
                 {
                     Self::get_new_states(&self.state_machine, transition.0, &mut new_states);

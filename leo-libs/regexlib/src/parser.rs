@@ -88,7 +88,10 @@
 //!     -> b
 //!     -> c
 
-use crate::{generator::Expr, state_machine::BracketExpr};
+use crate::{
+    generator::Expr,
+    state_machine::{BracketExpr, InnerBrackExpr},
+};
 
 #[derive(Debug, Clone)]
 pub struct ASTRoot {
@@ -313,11 +316,24 @@ impl<'a> Parser<'a> {
         loop {
             let i = self.idx;
             let c = self.src[i];
-            if i > 0 && self.src[i - 1] == '\\' {
-                todo!("handle backslash");
-            }
+            let c1 = if i == 0 { None } else { Some(self.src[i - 1]) };
+            println!("{c} {c1:?}");
             let p_in_single = self.in_single;
+            let box_expr = if c == ']' {
+                Some(self.parse_box_expr())
+            } else {
+                None
+            };
             let av = self.get_av();
+
+            if let Some('\\') = c1 {
+                av.push(handle_regex_special_chars(c));
+                self.idx -= 2;
+                if self.idx == 0 {
+                    break;
+                }
+                continue;
+            }
 
             match c {
                 '|' => {
@@ -332,7 +348,15 @@ impl<'a> Parser<'a> {
                     self.union_depths.push(self.vec_depth);
                 }
                 ']' => {
-                    todo!("parse box expr")
+                    if p_in_single {
+                        add_to_deepest_single(
+                            av.last_mut().unwrap(),
+                            ASTNode::BracketExpr(box_expr.unwrap()),
+                        );
+                        self.in_single = false;
+                    } else {
+                        av.push(ASTNode::BracketExpr(box_expr.unwrap()));
+                    }
                 }
                 '.' => {
                     if p_in_single {
@@ -364,6 +388,15 @@ impl<'a> Parser<'a> {
                         panic!("* cannot be followed by *, ?, +, etc.")
                     }
                     av.push(ASTNode::ZeroOrMore {
+                        inner: Box::new(ASTNode::NotSet),
+                    });
+                    self.in_single = true;
+                }
+                '+' => {
+                    if p_in_single {
+                        panic!("+ cannot be followed by *, ?, +, etc.")
+                    }
+                    av.push(ASTNode::OneOrMore {
                         inner: Box::new(ASTNode::NotSet),
                     });
                     self.in_single = true;
@@ -405,7 +438,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            if i == 0 {
+            if self.idx == 0 {
                 break;
             }
             self.idx -= 1;
@@ -413,6 +446,74 @@ impl<'a> Parser<'a> {
 
         ASTRoot {
             orig_concats: self.outer_vec,
+        }
+    }
+
+    fn parse_box_expr(&mut self) -> BracketExpr {
+        assert!(self.src[self.idx] == ']');
+        let mut r_end = None;
+        let mut res = BracketExpr {
+            inverted: false,
+            inner_be: vec![],
+        };
+        self.idx -= 1;
+        while self.src[self.idx] != '[' {
+            let next = self.src[self.idx - 1];
+            let next_escaped = if self.idx > 1 {
+                self.src[self.idx - 2] == '\\'
+            } else {
+                false
+            };
+            let char = if next == '\\' {
+                handle_special_chars(self.src[self.idx]);
+                self.idx -= 2;
+                continue;
+            } else {
+                self.src[self.idx]
+            };
+
+            if next == '[' && char == '^' {
+                res.inverted = true;
+                break;
+            }
+
+            if r_end.is_none() {
+                if next == '-' && !next_escaped {
+                    r_end = Some(char);
+                    self.idx -= 2;
+                    continue;
+                } else {
+                    res.inner_be.push(InnerBrackExpr::Char(char));
+                }
+            } else {
+                res.inner_be
+                    .push(InnerBrackExpr::Range(char, r_end.unwrap()));
+                r_end = None;
+            }
+
+            self.idx -= 1;
+        }
+        res
+    }
+}
+
+fn handle_regex_special_chars(c: char) -> ASTNode {
+    match c {
+        '(' | ')' | '[' | ']' | '.' | '*' | '?' | '+' | '|' | '^' | '$' | '\\' => ASTNode::Char(c),
+        't' => ASTNode::Char('\t'),
+        'n' => ASTNode::Char('\n'),
+        'r' => ASTNode::Char('\r'),
+        _ => ASTNode::Char(handle_special_chars(c)),
+    }
+}
+fn handle_special_chars(c: char) -> char {
+    match c {
+        't' => '\t',
+        'n' => '\n',
+        'r' => '\r',
+        '-' => '-',
+        _ => {
+            panic!("unknown escape character: {c:?}");
         }
     }
 }

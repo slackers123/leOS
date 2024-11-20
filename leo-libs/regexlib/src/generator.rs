@@ -78,11 +78,9 @@ impl Expr {
                 transitions[*states_cnt].push((*states_cnt + 1, Some(TransitionCondition::Any)));
                 new_state(transitions, states_cnt);
             }
-            Expr::BracketExpr(bracket_expr) => {
-                transitions[*states_cnt].push((
-                    *states_cnt + 1,
-                    Some(TransitionCondition::BracketExpr(bracket_expr)),
-                ));
+            Expr::BracketExpr(b) => {
+                transitions[*states_cnt]
+                    .push((*states_cnt + 1, Some(TransitionCondition::BracketExpr(b))));
                 new_state(transitions, states_cnt);
             }
             Expr::StrEnd => {
