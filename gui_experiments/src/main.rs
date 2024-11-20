@@ -1,6 +1,6 @@
-use drawlib::{drawable::Drawable, path::Path};
-use imgsave::Qimg;
-use mathlib::vectors::Vec2;
+// use drawlib::{drawable::Drawable, path::Path};
+// use imgsave::Qimg;
+// use mathlib::vectors::Vec2;
 
 mod imgsave;
 // mod parsertest;
@@ -12,8 +12,9 @@ fn main() {
 
     // regexlib::test_epsilon_state_machine();
 
-    let regex_sm = regexlib::new_regex_state_machine("a(abc)*|def");
-    let res = regexlib::validate_regex(regex_sm, "aabcabc");
+    let regex_sm =
+        regexlib::new_regex_state_machine(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+");
+    let res = regexlib::validate_regex(regex_sm, "s@g.t");
     assert!(res);
 
     // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
