@@ -89,6 +89,7 @@
 //!     -> c
 
 use crate::{
+    bracketexpr::parse_bracket_expr,
     generator::Expr,
     state_machine::{BracketExpr, InnerBrackExpr},
 };
@@ -320,7 +321,7 @@ impl<'a> Parser<'a> {
             println!("{c} {c1:?}");
             let p_in_single = self.in_single;
             let box_expr = if c == ']' {
-                Some(self.parse_box_expr())
+                Some(parse_bracket_expr(&self.src, &mut self.idx))
             } else {
                 None
             };
@@ -448,53 +449,6 @@ impl<'a> Parser<'a> {
             orig_concats: self.outer_vec,
         }
     }
-
-    fn parse_box_expr(&mut self) -> BracketExpr {
-        assert!(self.src[self.idx] == ']');
-        let mut r_end = None;
-        let mut res = BracketExpr {
-            inverted: false,
-            inner_be: vec![],
-        };
-        self.idx -= 1;
-        while self.src[self.idx] != '[' {
-            let next = self.src[self.idx - 1];
-            let next_escaped = if self.idx > 1 {
-                self.src[self.idx - 2] == '\\'
-            } else {
-                false
-            };
-            let char = if next == '\\' {
-                handle_special_chars(self.src[self.idx]);
-                self.idx -= 2;
-                continue;
-            } else {
-                self.src[self.idx]
-            };
-
-            if next == '[' && char == '^' {
-                res.inverted = true;
-                break;
-            }
-
-            if r_end.is_none() {
-                if next == '-' && !next_escaped {
-                    r_end = Some(char);
-                    self.idx -= 2;
-                    continue;
-                } else {
-                    res.inner_be.push(InnerBrackExpr::Char(char));
-                }
-            } else {
-                res.inner_be
-                    .push(InnerBrackExpr::Range(char, r_end.unwrap()));
-                r_end = None;
-            }
-
-            self.idx -= 1;
-        }
-        res
-    }
 }
 
 fn handle_regex_special_chars(c: char) -> ASTNode {
@@ -506,7 +460,7 @@ fn handle_regex_special_chars(c: char) -> ASTNode {
         _ => ASTNode::Char(handle_special_chars(c)),
     }
 }
-fn handle_special_chars(c: char) -> char {
+pub fn handle_special_chars(c: char) -> char {
     match c {
         't' => '\t',
         'n' => '\n',
