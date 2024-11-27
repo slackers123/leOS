@@ -88,13 +88,9 @@
 //!     -> b
 //!     -> c
 
-use crate::{
-    bracketexpr::parse_bracket_expr,
-    generator::Expr,
-    state_machine::{BracketExpr, InnerBrackExpr},
-};
+use crate::{bracketexpr::parse_bracket_expr, generator::Expr, state_machine::BracketExpr};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ASTRoot {
     pub orig_concats: Vec<ASTNode>,
 }
@@ -112,7 +108,6 @@ impl ASTRoot {
                 t: Box::new(Self::node_vec_concat(lhs)),
             },
             ASTNode::StrEnd => Expr::StrEnd,
-            ASTNode::NotSet => panic!("somehow a NotSet has leaked into the expr generation."),
             ASTNode::Char(c) => Expr::Char(c),
             ASTNode::StrStart => Expr::StrStart,
             ASTNode::AtMost { inner: _, end: _ } => {
@@ -156,15 +151,14 @@ impl ASTRoot {
 
     fn concat(orig: &mut Expr, new: Expr) {
         *orig = Expr::Concat {
-            s: Box::new(new),
-            t: Box::new(orig.clone()),
+            s: Box::new(orig.clone()),
+            t: Box::new(new),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ASTNode {
-    NotSet,
     Char(char),
     Or {
         lhs: Vec<ASTNode>,
@@ -201,256 +195,6 @@ pub enum ASTNode {
     },
 }
 
-pub struct Parser<'a> {
-    pub src: &'a [char],
-    idx: usize,
-    outer_vec: Vec<ASTNode>,
-    vec_depth: usize,
-    union_depths: Vec<usize>,
-    /// currently parsing *, +, ?, etc.
-    in_single: bool,
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(src: &'a [char]) -> Parser<'a> {
-        Parser {
-            idx: src.len() - 1,
-            src,
-            outer_vec: Vec::new(),
-            vec_depth: 0,
-            union_depths: Vec::new(),
-            in_single: false,
-        }
-    }
-
-    fn get_av(&mut self) -> &mut Vec<ASTNode> {
-        fn get_new_curr<'b>(last: &'b mut ASTNode) -> &'b mut Vec<ASTNode> {
-            match last {
-                ASTNode::Or { lhs, rhs: _ } => lhs,
-                ASTNode::Subexpr { inner } => inner,
-                ASTNode::ZeroOrMore { inner } => get_new_curr(inner),
-                ASTNode::OneOrMore { inner } => get_new_curr(inner),
-                ASTNode::ZeroOrOne { inner } => get_new_curr(inner),
-                ASTNode::InRange {
-                    inner,
-                    start: _,
-                    end: _,
-                } => get_new_curr(inner),
-                ASTNode::AtLeast { inner, start: _ } => get_new_curr(inner),
-                ASTNode::AtMost { inner, end: _ } => get_new_curr(inner),
-                _ => panic!("vec depth not reachable"),
-            }
-        }
-
-        let mut curr = &mut self.outer_vec;
-        let mut d = 0;
-        while d < self.vec_depth {
-            if let Some(last) = curr.last_mut() {
-                curr = get_new_curr(last);
-                d += 1;
-            } else {
-                panic!("vec depth not reachable");
-            }
-        }
-        curr
-    }
-
-    pub fn parse(mut self) -> ASTRoot {
-        fn add_to_deepest_single(t_node: &mut ASTNode, new_node: ASTNode) {
-            match t_node {
-                ASTNode::ZeroOrMore { ref mut inner } => {
-                    if *inner.as_ref() == ASTNode::NotSet {
-                        *inner = Box::new(new_node);
-                    } else {
-                        add_to_deepest_single(inner, new_node);
-                    }
-                }
-                ASTNode::OneOrMore { ref mut inner } => {
-                    if *inner.as_ref() == ASTNode::NotSet {
-                        *inner = Box::new(new_node);
-                    } else {
-                        add_to_deepest_single(inner, new_node);
-                    }
-                }
-                ASTNode::ZeroOrOne { ref mut inner } => {
-                    if *inner.as_ref() == ASTNode::NotSet {
-                        *inner = Box::new(new_node);
-                    } else {
-                        add_to_deepest_single(inner, new_node);
-                    }
-                }
-                ASTNode::InRange {
-                    ref mut inner,
-                    start: _,
-                    end: _,
-                } => {
-                    if *inner.as_ref() == ASTNode::NotSet {
-                        *inner = Box::new(new_node);
-                    } else {
-                        add_to_deepest_single(inner, new_node);
-                    }
-                }
-                ASTNode::AtLeast {
-                    ref mut inner,
-                    start: _,
-                } => {
-                    if *inner.as_ref() == ASTNode::NotSet {
-                        *inner = Box::new(new_node);
-                    } else {
-                        add_to_deepest_single(inner, new_node);
-                    }
-                }
-                ASTNode::AtMost {
-                    ref mut inner,
-                    end: _,
-                } => {
-                    if *inner.as_ref() == ASTNode::NotSet {
-                        *inner = Box::new(new_node);
-                    } else {
-                        add_to_deepest_single(inner, new_node);
-                    }
-                }
-                _ => panic!("not a single"),
-            }
-        }
-
-        loop {
-            let i = self.idx;
-            let c = self.src[i];
-            let c1 = if i == 0 { None } else { Some(self.src[i - 1]) };
-            println!("{c} {c1:?}");
-            let p_in_single = self.in_single;
-            let box_expr = if c == ']' {
-                Some(parse_bracket_expr(&self.src, &mut self.idx))
-            } else {
-                None
-            };
-            let av = self.get_av();
-
-            if let Some('\\') = c1 {
-                av.push(handle_regex_special_chars(c));
-                self.idx -= 2;
-                if self.idx == 0 {
-                    break;
-                }
-                continue;
-            }
-
-            match c {
-                '|' => {
-                    if p_in_single {
-                        panic!("| can not be followed by *, ?, +, etc.");
-                    }
-                    *av = vec![ASTNode::Or {
-                        lhs: vec![],
-                        rhs: av.clone(),
-                    }];
-                    self.vec_depth += 1;
-                    self.union_depths.push(self.vec_depth);
-                }
-                ']' => {
-                    if p_in_single {
-                        add_to_deepest_single(
-                            av.last_mut().unwrap(),
-                            ASTNode::BracketExpr(box_expr.unwrap()),
-                        );
-                        self.in_single = false;
-                    } else {
-                        av.push(ASTNode::BracketExpr(box_expr.unwrap()));
-                    }
-                }
-                '.' => {
-                    if p_in_single {
-                        add_to_deepest_single(av.last_mut().unwrap(), ASTNode::Any);
-                        self.in_single = false;
-                    } else {
-                        av.push(ASTNode::Any);
-                    }
-                }
-                '^' => {
-                    if p_in_single {
-                        panic!("^ cannot be followed by *, ?, +, etc.")
-                    }
-                    av.push(ASTNode::StrStart);
-                }
-                '$' => {
-                    if p_in_single {
-                        panic!("^ cannot be followed by *, ?, +, etc.")
-                    }
-                    av.push(ASTNode::StrEnd);
-                }
-                '\\' => {
-                    unreachable!(
-                        "should not be reachable because of stuff in the begining of this function"
-                    )
-                }
-                '*' => {
-                    if p_in_single {
-                        panic!("* cannot be followed by *, ?, +, etc.")
-                    }
-                    av.push(ASTNode::ZeroOrMore {
-                        inner: Box::new(ASTNode::NotSet),
-                    });
-                    self.in_single = true;
-                }
-                '+' => {
-                    if p_in_single {
-                        panic!("+ cannot be followed by *, ?, +, etc.")
-                    }
-                    av.push(ASTNode::OneOrMore {
-                        inner: Box::new(ASTNode::NotSet),
-                    });
-                    self.in_single = true;
-                }
-                '?' => {
-                    if p_in_single {
-                        panic!("? cannot be followed by *, ?, +, etc.")
-                    }
-                    av.push(ASTNode::ZeroOrOne {
-                        inner: Box::new(ASTNode::NotSet),
-                    });
-                    self.in_single = true;
-                }
-                '{' | '}' => {
-                    todo!("ranges")
-                }
-                '(' => {
-                    self.vec_depth -= 1;
-                }
-                ')' => {
-                    if p_in_single {
-                        add_to_deepest_single(
-                            av.last_mut().unwrap(),
-                            ASTNode::Subexpr { inner: vec![] },
-                        );
-                        self.in_single = false;
-                    } else {
-                        av.push(ASTNode::Subexpr { inner: vec![] });
-                    }
-                    self.vec_depth += 1;
-                }
-                _ => {
-                    if p_in_single {
-                        add_to_deepest_single(av.last_mut().unwrap(), ASTNode::Char(c));
-                        self.in_single = false;
-                    } else {
-                        av.push(ASTNode::Char(c));
-                    }
-                }
-            }
-
-            if self.idx == 0 {
-                break;
-            }
-            self.idx -= 1;
-        }
-
-        ASTRoot {
-            orig_concats: self.outer_vec,
-        }
-    }
-}
-
 fn handle_regex_special_chars(c: char) -> ASTNode {
     match c {
         '(' | ')' | '[' | ']' | '.' | '*' | '?' | '+' | '|' | '^' | '$' | '\\' => ASTNode::Char(c),
@@ -470,4 +214,65 @@ pub fn handle_special_chars(c: char) -> char {
             panic!("unknown escape character: {c:?}");
         }
     }
+}
+
+pub fn parse(src: &[char], index: &mut usize) -> Vec<ASTNode> {
+    let mut nodes: Vec<ASTNode> = Vec::new();
+
+    while *index < src.len() {
+        let c = src[*index];
+        match c {
+            '*' => {
+                if let Some(last) = nodes.last_mut() {
+                    *last = ASTNode::ZeroOrMore {
+                        inner: Box::new(last.clone()),
+                    };
+                }
+            }
+            '+' => {
+                if let Some(last) = nodes.last_mut() {
+                    *last = ASTNode::OneOrMore {
+                        inner: Box::new(last.clone()),
+                    };
+                }
+            }
+            '?' => {
+                if let Some(last) = nodes.last_mut() {
+                    *last = ASTNode::ZeroOrOne {
+                        inner: Box::new(last.clone()),
+                    };
+                }
+            }
+            '|' => {
+                *index += 1;
+                nodes = vec![ASTNode::Or {
+                    lhs: nodes,
+                    rhs: parse(src, index),
+                }];
+                break;
+            }
+            '(' => {
+                *index += 1;
+                let inner = parse(src, index);
+                nodes.push(ASTNode::Subexpr { inner });
+            }
+            ')' => {
+                break;
+            }
+            '[' => {
+                nodes.push(ASTNode::BracketExpr(parse_bracket_expr(src, index)));
+            }
+            '\\' => {
+                *index += 1;
+                let escaped = src[*index];
+                nodes.push(handle_regex_special_chars(escaped));
+            }
+            '.' => nodes.push(ASTNode::Any),
+            '^' => nodes.push(ASTNode::StrStart),
+            '$' => nodes.push(ASTNode::StrEnd),
+            _ => nodes.push(ASTNode::Char(c)),
+        }
+        *index += 1;
+    }
+    nodes
 }
