@@ -10,9 +10,9 @@ fn main() {
     //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
 
-    let regex_sm =
+    let regex =
         regexlib::new_regex_state_machine(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+");
-    let res = regexlib::validate_regex(regex_sm, "s@g.t");
+    let res = regexlib::validate_regex(&regex, "severin.gebesmair@proton.me");
     assert!(res);
 
     // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();

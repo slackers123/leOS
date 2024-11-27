@@ -114,7 +114,7 @@ impl<'a> RunningEpsilonNFA<'a> {
     }
 
     pub fn run_iteration(&mut self, c: char, is_start: bool, is_end: bool) {
-        println!("{:?}", self.current_states);
+        // println!("{:?}", self.current_states);
         let mut new_states = HashMap::new();
         for state in &self.current_states {
             for transition in &self.state_machine.transitions[*state] {
