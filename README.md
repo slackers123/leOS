@@ -17,3 +17,5 @@ only things that exist are:
   - ttflib: loading glyphs from a TrueType font file
   - drawlib: drawing of shapes onto a generic target (currently only used in gui_lib)
 - gui_experiments: native bootstrapping for testing drawlib etc.
+
+[![brainmade.org](https://raw.githubusercontent.com/0atman/BrainMade-org/refs/heads/main/docs/white-logo.svg)](https://brainmade.org)
