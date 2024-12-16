@@ -7,4 +7,6 @@ pub mod equations;
 pub mod funcs;
 pub mod horiz_line_intersect;
 pub mod line_seg;
+pub mod matrix;
+pub mod number;
 pub mod vectors;
