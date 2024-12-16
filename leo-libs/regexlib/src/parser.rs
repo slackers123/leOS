@@ -110,18 +110,8 @@ impl ASTRoot {
             ASTNode::StrEnd => Expr::StrEnd,
             ASTNode::Char(c) => Expr::Char(c),
             ASTNode::StrStart => Expr::StrStart,
-            ASTNode::AtMost { inner: _, end: _ } => {
-                todo!()
-            }
-            ASTNode::AtLeast { inner: _, start: _ } => {
-                todo!()
-            }
             ASTNode::BracketExpr(b) => Expr::BracketExpr(b),
-            ASTNode::InRange {
-                inner: _,
-                start: _,
-                end: _,
-            } => todo!(),
+            ASTNode::InRange { inner, start, end } => todo!(),
             ASTNode::Subexpr { inner } => Self::node_vec_concat(inner),
             ASTNode::OneOrMore { inner } => Expr::Concat {
                 // a+ <=> aa*
@@ -183,14 +173,6 @@ pub enum ASTNode {
     InRange {
         inner: Box<ASTNode>,
         start: usize,
-        end: usize,
-    },
-    AtLeast {
-        inner: Box<ASTNode>,
-        start: usize,
-    },
-    AtMost {
-        inner: Box<ASTNode>,
         end: usize,
     },
 }
@@ -270,9 +252,40 @@ pub fn parse(src: &[char], index: &mut usize) -> Vec<ASTNode> {
             '.' => nodes.push(ASTNode::Any),
             '^' => nodes.push(ASTNode::StrStart),
             '$' => nodes.push(ASTNode::StrEnd),
+            '{' => {
+                if let Some(last) = nodes.last_mut() {
+                    *last = parse_range(src, index, Box::new(last.clone()));
+                }
+            }
             _ => nodes.push(ASTNode::Char(c)),
         }
         *index += 1;
     }
     nodes
+}
+
+pub fn parse_range(src: &[char], idx: &mut usize, inner: Box<ASTNode>) -> ASTNode {
+    assert!(src[*idx] == '{');
+
+    let mut start = 0;
+    let mut end = 0;
+
+    let mut first = true;
+
+    while src[*idx] != '}' {
+        let cur = src[*idx];
+        if cur == ',' {
+            first = false;
+            continue;
+        }
+
+        if first {
+            start *= 10;
+            start += (cur as u8) as usize - 48;
+        } else {
+            end *= 10;
+            end += (cur as u8) as usize - 48;
+        }
+    }
+    ASTNode::InRange { inner, start, end }
 }

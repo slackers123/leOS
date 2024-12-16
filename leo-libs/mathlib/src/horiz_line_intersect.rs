@@ -1,8 +1,8 @@
 use corelib::types::{Float, Uint};
 
-use crate::{aabb::AABB, equations::Equation, funcs::approx_in_range, vectors::Vec2};
+use crate::{aabb::AABB, equations::EquationRoots, funcs::approx_in_range, vectors::Vec2};
 
-pub trait HorizLineIntersect<E: Equation>
+pub trait HorizLineIntersect<E: EquationRoots>
 where
     Self: Sized,
 {
@@ -34,7 +34,7 @@ where
     }
 }
 
-pub trait HlinIsect {}
+// pub trait HlinIsect {}
 
 fn test_point_in_range(y_min: Float, y_max: Float, test_point: Vec2<Float>) -> bool {
     approx_in_range(&test_point.y, y_min, y_max)

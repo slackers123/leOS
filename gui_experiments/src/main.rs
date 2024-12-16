@@ -2,6 +2,10 @@
 // use imgsave::Qimg;
 // use mathlib::vectors::Vec2;
 
+use std::f32::consts::PI;
+
+use mathlib::{elliptical_arc::EllipticalArc, vectors::Vec2};
+
 mod imgsave;
 // mod parsertest;
 
@@ -10,8 +14,7 @@ fn main() {
     //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
 
-    let regex =
-        regexlib::new_regex_state_machine(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+");
+    let regex = regexlib::new_regex(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+");
     let res = regexlib::validate_regex(&regex, "severin.gebesmair@proton.me");
     assert!(res);
 

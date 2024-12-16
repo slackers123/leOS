@@ -25,12 +25,11 @@ pub struct CubicEquation {
     pub d: Float,
 }
 
-pub trait Equation {
+pub trait EquationRoots {
     fn roots(&self) -> Vec<Float>;
-    fn y_from_x(&self, x: Float) -> Float;
 }
 
-impl Equation for CubicEquation {
+impl EquationRoots for CubicEquation {
     fn roots(&self) -> Vec<Float> {
         if approx_eq(self.a, 0.0) {
             if approx_eq(self.b, 0.0) {
@@ -81,12 +80,12 @@ impl Equation for CubicEquation {
         }
     }
 
-    fn y_from_x(&self, x: Float) -> Float {
-        x.powi(3) * self.a + x.powi(2) * self.b + x * self.c + self.d
-    }
+    // fn y_from_x(&self, x: Float) -> Float {
+    //     x.powi(3) * self.a + x.powi(2) * self.b + x * self.c + self.d
+    // }
 }
 
-impl Equation for QuadraticEquation {
+impl EquationRoots for QuadraticEquation {
     fn roots(&self) -> Vec<Float> {
         let Self { a, b, c } = self;
         // quadratic equation: x1,2 = (-b +/- (b.powi(2) - 4. * a * c).sqrt()) / (2. * a)
@@ -105,12 +104,12 @@ impl Equation for QuadraticEquation {
         }
     }
 
-    fn y_from_x(&self, x: Float) -> Float {
-        x.powi(2) * self.a + x * self.b + self.c
-    }
+    // fn y_from_x(&self, x: Float) -> Float {
+    //     x.powi(2) * self.a + x * self.b + self.c
+    // }
 }
 
-impl Equation for LinearEquation {
+impl EquationRoots for LinearEquation {
     fn roots(&self) -> Vec<Float> {
         let Self { a, b } = self;
         if approx_eq(*a, 0.) {
@@ -119,7 +118,7 @@ impl Equation for LinearEquation {
             return vec![b / a];
         }
     }
-    fn y_from_x(&self, x: Float) -> Float {
-        x * self.a + self.b
-    }
+    // fn y_from_x(&self, x: Float) -> Float {
+    //     x * self.a + self.b
+    // }
 }

@@ -103,3 +103,12 @@ impl<T: SubAssign + Copy> ops::SubAssign for Vec2<T> {
         *self = *self - rhs;
     }
 }
+
+impl<T: MulAssign + Copy> ops::Mul for Vec2<T> {
+    type Output = Vec2<T>;
+    fn mul(mut self, rhs: Vec2<T>) -> Vec2<T> {
+        self.x *= rhs.x;
+        self.y *= rhs.y;
+        self
+    }
+}
