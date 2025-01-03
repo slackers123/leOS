@@ -1,93 +1,3 @@
-//! abc|def
-//! Char a
-//!
-//! Concat
-//! -> Char a
-//! -> Char b
-//!
-//! Concat
-//! -> Concat
-//!     -> Char a
-//!     -> Char b
-//! -> Char c
-//!
-//! Union
-//! -> Concat
-//!     -> Concat
-//!         -> Char a
-//!         -> Char b
-//!     -> Char c
-//! -> Char d
-//!
-//! ---
-//!
-//! Union
-//! -> Concat
-//!     -> Char a
-//!     -> Concat
-//!         -> Char b
-//!         -> Char c
-//! -> Concat
-//!     -> Char d
-//!     -> Concat
-//!         -> Char e
-//!         -> char f
-//!
-//! ---
-//!
-//! |abc
-//! Union
-//! -> None
-//! -> Concat
-//!     -> Char a
-//!     -> Concat
-//!         -> Char b
-//!         -> Char c
-//!
-//!
-//! a(abc)*|def
-//!
-//! av:
-//! f
-//! e
-//! d
-//!
-//! new outer av
-//! av:
-//! union -rhs> fed
-//!
-//! av is now union lhs
-//! av:
-//! zeroOrMore -> subexpr
-//!
-//! av is now subexpr inner
-//! av:
-//! c
-//! b
-//! a
-//!
-//! go up in av tree
-//! av:
-//! zeroOrMore -> subexpr -> dba
-//! a
-//!
-//! Union
-//! -> Concat
-//!     -> a
-//!     -> ZeroOrMore
-//!         -> Subexpr
-//!             -> abc
-//! -> def
-//!
-//!
-//!
-//! cba
-//! Concat
-//! -> a
-//! -> Concat
-//!     -> b
-//!     -> c
-
 use crate::{bracketexpr::parse_bracket_expr, generator::Expr, state_machine::BracketExpr};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,7 +6,7 @@ pub struct ASTRoot {
 }
 
 impl ASTRoot {
-    pub fn to_expr(self) -> Expr {
+    pub fn into_expr(self) -> Expr {
         Self::node_vec_concat(self.orig_concats)
     }
 

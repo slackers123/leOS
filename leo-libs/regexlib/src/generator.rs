@@ -96,27 +96,10 @@ impl Expr {
     }
 }
 
-pub fn example() -> Expr {
-    Expr::Union {
-        s: Box::new(Expr::None),
-        t: Box::new(Expr::Concat {
-            s: Box::new(Expr::KleeneStar {
-                s: Box::new(Expr::Char('a')),
-            }),
-            t: Box::new(Expr::Char('b')),
-        }),
-    }
-}
-
 pub fn generate(src: Expr) -> EpsilonNFA {
     let mut transitions: Transitions = vec![vec![]];
     let mut states_cnt = 0;
     src.generate_transitions(&mut transitions, &mut states_cnt);
 
-    EpsilonNFA {
-        states: states_cnt,
-        transitions,
-        start: 0,
-        end: states_cnt,
-    }
+    EpsilonNFA { transitions }
 }

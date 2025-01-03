@@ -12,6 +12,7 @@ pub enum TransitionCondition {
     StrStart,
     StrEnd,
 }
+
 impl TransitionCondition {
     pub fn check(&self, c: char, is_start: bool, is_end: bool) -> bool {
         match self {
@@ -24,24 +25,30 @@ impl TransitionCondition {
     }
 }
 
+/// A regex bracket expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BracketExpr {
+    /// a bracket expression is inverted when a ^ character is the first character in the
+    /// bracket expression.
     pub inverted: bool,
-    pub inner_be: Vec<InnerBrackExpr>,
+    /// a bracket expression may be made up of multiple parts which can eiter be individual
+    /// characters or ranges of characters
+    pub inner_be: Vec<InnerBracketExpr>,
 }
 
 impl BracketExpr {
+    /// checks if a
     pub fn check(&self, c: char) -> bool {
         let mut res = false;
         for inner in &self.inner_be {
             match inner {
-                InnerBrackExpr::Char(c1) => {
+                InnerBracketExpr::Char(c1) => {
                     if *c1 == c {
                         res = true;
                         break;
                     }
                 }
-                InnerBrackExpr::Range(c1, c2) => {
+                InnerBracketExpr::Range(c1, c2) => {
                     if (*c1..=*c2).contains(&c) {
                         res = true;
                         break;
@@ -50,12 +57,12 @@ impl BracketExpr {
             }
         }
 
-        !self.inverted == res
+        self.inverted != res
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum InnerBrackExpr {
+pub enum InnerBracketExpr {
     Char(char),
     Range(char, char),
 }
@@ -63,28 +70,22 @@ pub enum InnerBrackExpr {
 /// (Epsilon) nondeterministic finite automaton
 #[derive(Debug)]
 pub struct EpsilonNFA {
-    /// number of states and also the states themselves kinda
-    pub states: usize,
-    /// the meat and potatoes
-    ///
     /// ### The outer Vec
     /// The source state so when trying to figure out which
-    /// trainsitions can be made from e.g. state 5 just do ```transitions[5]```
+    /// transitions can be made from e.g. state 5 use ```transitions[5]```
     ///
     /// ### The inner Vec
     /// The possible transitions from a state to new states.
-    /// The ```usize``` is the new state and the ```Option<char>``` is
+    /// The ```usize``` is the new state and the ```Option<TransitionCondition>``` is
     /// the optional condition (None -> Epsilon condition)
     pub transitions: Transitions,
-
-    /// The start of the state machine
-    pub start: usize,
-    /// Reaching this state indicates a match
-    pub end: usize,
 }
 
 /// A running (epsilon) nondeterministic finite automaton
-#[derive(Debug)]
+///
+/// This is useful for reusing regexes since the parsing and NFA generation
+/// take a lot longer than execution.
+#[derive(Debug, Clone)]
 pub struct RunningEpsilonNFA<'a> {
     state_machine: &'a EpsilonNFA,
     current_states: Vec<usize>,
@@ -93,38 +94,47 @@ pub struct RunningEpsilonNFA<'a> {
 impl<'a> RunningEpsilonNFA<'a> {
     pub fn new(state_machine: &'a EpsilonNFA) -> Self {
         let mut new_states = HashMap::new();
-        new_states.insert(state_machine.start, ());
-        for transition in &state_machine.transitions[state_machine.start] {
-            if transition.1.is_none() {
-                Self::get_new_states(&state_machine, transition.0, &mut new_states);
-            }
-        }
+        Self::get_new_states(state_machine, 0, &mut new_states);
         Self {
             current_states: new_states.into_keys().collect(),
             state_machine,
         }
     }
 
-    pub fn validate(mut self, string: &str) -> bool {
-        for (i, c) in string.chars().enumerate() {
+    pub fn validate(mut self, string: &str, skip: usize) -> (bool, usize) {
+        let mut chars_covered = 0;
+        let mut early_exit_flag = false;
+        let mut last_states = self.current_states.clone();
+        for (i, c) in string.chars().enumerate().skip(skip) {
+            last_states = self.current_states.clone();
             self.run_iteration(c, i == 0, i == string.len() - 1);
-            // println!("{:?}", self.current_states);
+            chars_covered += 1;
+            if self.current_states.is_empty() {
+                early_exit_flag = true;
+                break;
+            }
         }
-        self.current_states.contains(&self.state_machine.end)
+        if early_exit_flag && last_states.contains(&(self.state_machine.transitions.len() - 1)) {
+            return (true, chars_covered - 1);
+        }
+        if self
+            .current_states
+            .contains(&(self.state_machine.transitions.len() - 1))
+        {
+            return (true, chars_covered);
+        }
+        (false, chars_covered)
     }
 
     pub fn run_iteration(&mut self, c: char, is_start: bool, is_end: bool) {
-        // println!("{:?}", self.current_states);
         let mut new_states = HashMap::new();
         for state in &self.current_states {
             for transition in &self.state_machine.transitions[*state] {
                 if transition.1.is_none() && !self.current_states.contains(&transition.0)
                     || transition.1.is_some()
-                    // FIXME: moving on to the next char depends on e.g. if the condition is "is_start"
-                    //        because other wise the first character will be skipped
                         && transition.1.as_ref().unwrap().check(c, is_start, is_end)
                 {
-                    Self::get_new_states(&self.state_machine, transition.0, &mut new_states);
+                    Self::get_new_states(self.state_machine, transition.0, &mut new_states);
                 }
             }
         }
