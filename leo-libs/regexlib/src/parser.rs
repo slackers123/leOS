@@ -21,7 +21,19 @@ impl ASTRoot {
             ASTNode::Char(c) => Expr::Char(c),
             ASTNode::StrStart => Expr::StrStart,
             ASTNode::BracketExpr(b) => Expr::BracketExpr(b),
-            ASTNode::InRange { inner, start, end } => todo!(),
+            ASTNode::InRange { inner, start, end } => {
+                let required = (0..start).map(|_| (*inner).clone());
+                let clos = |_| ASTNode::ZeroOrOne {
+                    inner: Box::new((*inner).clone()),
+                };
+                let optional1 = (start..end).map(clos);
+                let optional2 = (0usize..1usize).map(clos);
+                Self::node_vec_concat(
+                    required
+                        .chain(if end != 0 { optional1 } else { optional2 })
+                        .collect(),
+                )
+            }
             ASTNode::Subexpr { inner } => Self::node_vec_concat(inner),
             ASTNode::OneOrMore { inner } => Expr::Concat {
                 // a+ <=> aa*
@@ -181,11 +193,12 @@ pub fn parse_range(src: &[char], idx: &mut usize, inner: Box<ASTNode>) -> ASTNod
     let mut end = 0;
 
     let mut first = true;
-
+    *idx += 1;
     while src[*idx] != '}' {
         let cur = src[*idx];
         if cur == ',' {
             first = false;
+            *idx += 1;
             continue;
         }
 
@@ -196,6 +209,7 @@ pub fn parse_range(src: &[char], idx: &mut usize, inner: Box<ASTNode>) -> ASTNod
             end *= 10;
             end += (cur as u8) as usize - 48;
         }
+        *idx += 1;
     }
     ASTNode::InRange { inner, start, end }
 }
