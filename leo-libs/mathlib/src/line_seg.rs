@@ -1,7 +1,7 @@
 use corelib::types::Float;
 
 use crate::{
-    aabb::AABB, equations::LinearEquation, horiz_line_intersect::HorizLineIntersect, vectors::Vec2,
+    aabb::AABB, funcs::approx_eq, horiz_line_intersect::HorizLineIntersect, vectors::Vec2,
 };
 
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ impl LineSegment {
     }
 }
 
-impl HorizLineIntersect<LinearEquation> for LineSegment {
+impl HorizLineIntersect for LineSegment {
     fn bbox(&self) -> crate::aabb::AABB<Float> {
         let mut bbox = AABB::default();
         bbox.include_vec(&self.start);
@@ -24,22 +24,20 @@ impl HorizLineIntersect<LinearEquation> for LineSegment {
         bbox
     }
 
-    fn moved_y(&self, y_off: Float) -> Self {
-        let mut res = self.clone();
-        res.start.y += y_off;
-        res.end.y += y_off;
-        res
-    }
-
-    fn get_equation(&self) -> LinearEquation {
+    fn isect_at_y(&self, y: Float) -> Vec<Float> {
         let dx = self.end.x - self.start.x;
         let dy = self.end.y - self.start.y;
         let k = dx / dy;
-        let d = self.start.y - k * self.start.x;
-        LinearEquation { a: k, b: d }
-    }
-
-    fn root_filter(&self, t: &Float, test_x: Float) -> bool {
-        -t < test_x
+        // y = kx + d
+        if approx_eq(k, 0.) {
+            if approx_eq(self.start.y, y) {
+                return vec![self.start.x, self.end.x];
+            } else {
+                return vec![];
+            }
+        } else {
+            let d = (self.start.y - y) - k * self.start.x;
+            return vec![-(d / k)];
+        }
     }
 }

@@ -1,16 +1,26 @@
-use std::ops::{self, AddAssign, DivAssign, MulAssign, SubAssign};
+use std::ops::{self};
 
 use corelib::types::Float;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vec2<T> {
+use crate::{matrix::Mat, number::Number};
+
+#[derive(Copy, PartialEq, Debug, Clone)]
+pub struct Vec2<T: Number> {
     pub x: T,
     pub y: T,
 }
 
-impl<T> Vec2<T> {
+impl<T: Number> Vec2<T> {
     pub fn new(x: T, y: T) -> Self {
         Self { x, y }
+    }
+
+    pub fn to_mat(self) -> Mat<2, 1, T> {
+        Mat::new([[self.x], [self.y]])
+    }
+
+    pub fn from_mat(mat: Mat<2, 1, T>) -> Self {
+        Self::new(mat[0][0], mat[1][0])
     }
 }
 
@@ -40,9 +50,19 @@ impl Vec2<Float> {
         self.normalize();
         self
     }
+
+    pub fn dot(&self, rhs: &Self) -> Float {
+        self.x * rhs.x + self.y * rhs.y
+    }
+
+    pub fn angle_to(&self, rhs: &Self) -> Float {
+        let lower = (self.dot(rhs) / (self.length() * rhs.length())).clamp(-1.0, 1.0);
+
+        lower.acos() * (self.x * rhs.y - self.y * rhs.x).signum()
+    }
 }
 
-impl<T: SubAssign> ops::Sub<Vec2<T>> for Vec2<T> {
+impl<T: Number> ops::Sub<Vec2<T>> for Vec2<T> {
     type Output = Vec2<T>;
     fn sub(mut self, rhs: Vec2<T>) -> Self::Output {
         self.x -= rhs.x;
@@ -51,7 +71,7 @@ impl<T: SubAssign> ops::Sub<Vec2<T>> for Vec2<T> {
     }
 }
 
-impl<T: AddAssign> ops::Add<Vec2<T>> for Vec2<T> {
+impl<T: Number> ops::Add<Vec2<T>> for Vec2<T> {
     type Output = Vec2<T>;
     fn add(mut self, rhs: Vec2<T>) -> Self::Output {
         self.x += rhs.x;
@@ -60,7 +80,7 @@ impl<T: AddAssign> ops::Add<Vec2<T>> for Vec2<T> {
     }
 }
 
-impl<T: MulAssign + Copy> ops::Mul<T> for Vec2<T> {
+impl<T: Number> ops::Mul<T> for Vec2<T> {
     type Output = Vec2<T>;
     fn mul(mut self, rhs: T) -> Self::Output {
         self.x *= rhs;
@@ -76,7 +96,7 @@ impl ops::Mul<Vec2<Float>> for Float {
     }
 }
 
-impl<T: DivAssign + Copy> ops::Div<T> for Vec2<T> {
+impl<T: Number> ops::Div<T> for Vec2<T> {
     type Output = Vec2<T>;
     fn div(mut self, rhs: T) -> Self::Output {
         self.x /= rhs;
@@ -92,23 +112,32 @@ impl ops::Div<Vec2<Float>> for Float {
     }
 }
 
-impl<T: AddAssign + Copy> ops::AddAssign for Vec2<T> {
+impl<T: Number> ops::AddAssign for Vec2<T> {
     fn add_assign(&mut self, rhs: Vec2<T>) {
         *self = *self + rhs;
     }
 }
 
-impl<T: SubAssign + Copy> ops::SubAssign for Vec2<T> {
+impl<T: Number> ops::SubAssign for Vec2<T> {
     fn sub_assign(&mut self, rhs: Vec2<T>) {
         *self = *self - rhs;
     }
 }
 
-impl<T: MulAssign + Copy> ops::Mul for Vec2<T> {
+impl<T: Number> ops::Mul for Vec2<T> {
     type Output = Vec2<T>;
     fn mul(mut self, rhs: Vec2<T>) -> Vec2<T> {
         self.x *= rhs.x;
         self.y *= rhs.y;
+        self
+    }
+}
+
+impl<T: Number + ops::Neg<Output = T>> ops::Neg for Vec2<T> {
+    type Output = Self;
+    fn neg(mut self) -> Vec2<T> {
+        self.x = -self.x;
+        self.y = -self.y;
         self
     }
 }

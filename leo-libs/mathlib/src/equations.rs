@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::fmt::Debug;
 
 use corelib::types::Float;
 
@@ -25,7 +26,12 @@ pub struct CubicEquation {
     pub d: Float,
 }
 
+pub trait MathFunction {
+    fn get_y(x: Float) -> Float;
+}
+
 pub trait EquationRoots {
+    /// returns all roots as t and as x
     fn roots(&self) -> Vec<Float>;
 }
 
@@ -92,7 +98,7 @@ impl EquationRoots for QuadraticEquation {
         let square_term = b.powi(2) - 4. * a * c;
         if approx_eq(square_term, 0.) {
             let root = -b / (2. * a);
-            return vec![root];
+            return vec![root, root];
         } else if square_term > 0. {
             let root1 = (-b + (square_term).sqrt()) / (2. * a);
             let root2 = (-b - (square_term).sqrt()) / (2. * a);
@@ -110,15 +116,13 @@ impl EquationRoots for QuadraticEquation {
 }
 
 impl EquationRoots for LinearEquation {
+    #[inline]
     fn roots(&self) -> Vec<Float> {
         let Self { a, b } = self;
         if approx_eq(*a, 0.) {
             return vec![];
         } else {
-            return vec![b / a];
+            return vec![-(b / a)];
         }
     }
-    // fn y_from_x(&self, x: Float) -> Float {
-    //     x * self.a + self.b
-    // }
 }

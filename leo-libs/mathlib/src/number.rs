@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Display};
+
 pub trait Number:
     Copy
     + Clone
@@ -11,6 +13,8 @@ pub trait Number:
     + std::ops::SubAssign
     + std::ops::MulAssign
     + std::ops::DivAssign
+    + Debug
+    + Display
 {
     const ZERO: Self;
     const ONE: Self;

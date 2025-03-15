@@ -1,9 +1,9 @@
 use corelib::types::Float;
 
-use crate::vectors::Vec2;
+use crate::{number::Number, vectors::Vec2};
 
 #[derive(Debug, Clone, Copy)]
-pub struct AABB<T> {
+pub struct AABB<T: Number> {
     pub min: Vec2<T>,
     pub max: Vec2<T>,
 }

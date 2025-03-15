@@ -2,8 +2,8 @@ use corelib::types::Float;
 
 use crate::{
     aabb::AABB,
-    equations::{CubicEquation, QuadraticEquation},
-    funcs::approx_in_range_01,
+    equations::{CubicEquation, EquationRoots},
+    funcs::{approx_eq, approx_in_range_01},
     horiz_line_intersect::HorizLineIntersect,
     vectors::Vec2,
 };
@@ -26,13 +26,14 @@ impl QuadraticBezier {
 }
 
 impl Bezier for QuadraticBezier {
+    #[inline]
     fn pos_from_t(&self, t: Float) -> Vec2<Float> {
         // from: https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Quadratic_B%C3%A9zier_curves
         (1. - t) * ((1. - t) * self.p0 + t * self.p1) + t * ((1. - t) * self.p1 + t * self.p2)
     }
 }
 
-impl HorizLineIntersect<QuadraticEquation> for QuadraticBezier {
+impl HorizLineIntersect for QuadraticBezier {
     fn bbox(&self) -> AABB<Float> {
         // TODO: use more optimal bounding box generation
         let mut aabb = AABB::default();
@@ -42,24 +43,47 @@ impl HorizLineIntersect<QuadraticEquation> for QuadraticBezier {
         aabb
     }
 
-    fn moved_y(&self, y_off: Float) -> Self {
-        let mut res = self.clone();
-        res.p0.y += y_off;
-        res.p1.y += y_off;
-        res.p2.y += y_off;
-        res
-    }
+    fn isect_at_y(&self, y: Float) -> Vec<Float> {
+        let Self {
+            mut p0,
+            mut p1,
+            mut p2,
+        } = self.clone();
 
-    fn root_filter(&self, t: &Float, test_x: Float) -> bool {
-        approx_in_range_01(t) && self.pos_from_t(*t).x < test_x
-    }
+        p0.y -= y;
+        p1.y -= y;
+        p2.y -= y;
 
-    fn get_equation(&self) -> QuadraticEquation {
-        let a = self.p0.y - 2. * self.p1.y + self.p2.y;
-        let b = 2. * (self.p1.y - self.p0.y);
-        let c = self.p0.y;
+        let a = p0.y - 2. * p1.y + p2.y;
+        let b = 2. * (p1.y - p0.y);
+        let c = p0.y;
 
-        QuadraticEquation { a, b, c }
+        // quadratic equation: x1,2 = (-b +/- (b.powi(2) - 4. * a * c).sqrt()) / (2. * a)
+        let square_term = b.powi(2) - 4. * a * c;
+        let mut res = Vec::with_capacity(2);
+        if approx_eq(square_term, 0.) {
+            let root = -b / (2. * a);
+            if approx_in_range_01(root) {
+                let x = self.pos_from_t(root).x;
+                res.push(x);
+                res.push(x);
+            }
+        } else if square_term > 0. {
+            let root1 = (-b + (square_term).sqrt()) / (2. * a);
+            let root2 = (-b - (square_term).sqrt()) / (2. * a);
+
+            if approx_in_range_01(root1) {
+                res.push(self.pos_from_t(root1).x);
+            }
+            if approx_in_range_01(root2) {
+                res.push(self.pos_from_t(root2).x);
+            }
+        } else {
+            // term in square root is negative
+            // No solutions
+        }
+
+        return res;
     }
 }
 
@@ -87,7 +111,7 @@ impl Bezier for CubicBezier {
     }
 }
 
-impl HorizLineIntersect<CubicEquation> for CubicBezier {
+impl HorizLineIntersect for CubicBezier {
     fn bbox(&self) -> AABB<Float> {
         // TODO: use more optimal bounding box generation
         let mut aabb = AABB::default();
@@ -97,26 +121,42 @@ impl HorizLineIntersect<CubicEquation> for CubicBezier {
         aabb
     }
 
-    fn moved_y(&self, y_off: Float) -> Self {
-        let mut res = self.clone();
-        res.p0.y += y_off;
-        res.p1.y += y_off;
-        res.p2.y += y_off;
-        res.p3.y += y_off;
-        res
-    }
+    // fn zeroed(&self, off: Vec2<Float>) -> Self {
+    //     let mut res = self.clone();
+    //     res.p0 += off;
+    //     res.p1 += off;
+    //     res.p2 += off;
+    //     res.p3 += off;
+    //     res
+    // }
 
-    fn root_filter(&self, t: &Float, test_x: Float) -> bool {
-        approx_in_range_01(t) && self.pos_from_t(*t).x < test_x
-    }
+    // fn root_filter(&self, t: &Float, test_x: Float) -> bool {
+    //     approx_in_range_01(t)
+    // }
 
-    fn get_equation(&self) -> CubicEquation {
-        let CubicBezier { p0, p1, p2, p3 } = self;
+    fn isect_at_y(&self, y: Float) -> Vec<Float> {
+        let CubicBezier {
+            mut p0,
+            mut p1,
+            mut p2,
+            mut p3,
+        } = self.clone();
+        p0.y -= y;
+        p1.y -= y;
+        p2.y -= y;
+        p3.y -= y;
+
         let a = -p0.y + 3. * p1.y - 3. * p2.y + p3.y;
         let b = 3. * p0.y - 6. * p1.y + 3. * p2.y;
         let c = -3. * p0.y + 3. * p1.y;
         let d = p0.y;
 
-        CubicEquation { a, b, c, d }
+        let roots = CubicEquation { a, b, c, d }.roots();
+
+        return roots
+            .into_iter()
+            .filter(|t| approx_in_range_01(*t))
+            .map(|t| self.pos_from_t(t).x)
+            .collect();
     }
 }

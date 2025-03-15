@@ -25,13 +25,23 @@ pub fn approx_eq(a: Float, b: Float) -> bool {
 }
 
 /// is x approximately in range a..b
-pub fn approx_in_range(x: &Float, a: Float, b: Float) -> bool {
+pub fn approx_in_range(x: Float, a: Float, b: Float) -> bool {
     let base = x - a;
     let diff = b - a;
     base > -EPSILON && base < diff + EPSILON
 }
 
+/// is x approximately in range a..b
+/// and the order of a and b does not matter
+pub fn approx_in_range_no_order(x: Float, a: Float, b: Float) -> bool {
+    if a < b {
+        approx_in_range(x, a, b)
+    } else {
+        approx_in_range(x, b, a)
+    }
+}
+
 /// is x approximately in range 0..1
-pub fn approx_in_range_01(x: &Float) -> bool {
+pub fn approx_in_range_01(x: Float) -> bool {
     approx_in_range(x, 0., 1.)
 }
