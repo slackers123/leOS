@@ -25,9 +25,13 @@ impl HorizLineIntersect for LineSegment {
     }
 
     fn isect_at_y(&self, y: Float) -> Vec<Float> {
-        let dx = self.end.x - self.start.x;
-        let dy = self.end.y - self.start.y;
-        let k = dx / dy;
+        // This is not needed if the bbox check was performed
+        // if y < Float::min(self.end.y, self.start.y) || y > Float::max(self.end.y, self.start.y) {
+        //     println!("{y}");
+        //     return vec![];
+        // }
+        let d = self.end - self.start;
+        let k = d.x / d.y;
         // y = kx + d
         if approx_eq(k, 0.) {
             if approx_eq(self.start.y, y) {

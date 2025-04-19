@@ -1,12 +1,4 @@
-use corelib::types::{Float, Uint};
-use mathlib::{
-    bezier::{CubicBezier, QuadraticBezier},
-    horiz_line_intersect::HorizLineIntersect,
-    line_seg::LineSegment,
-    vectors::Vec2,
-};
-
-use crate::{drawable::Drawable, path::CompletePathSeg, rendererror::RenderResult};
+use crate::{drawable::Drawable, rendererror::RenderResult};
 
 use super::Path;
 

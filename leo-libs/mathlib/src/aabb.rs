@@ -23,6 +23,21 @@ impl AABB<Float> {
             self.max.y = point.y
         };
     }
+
+    #[inline]
+    pub fn y_inside(&self, y: Float) -> bool {
+        y > self.min.y && y < self.max.y
+    }
+
+    #[inline]
+    pub fn x_inside(&self, x: Float) -> bool {
+        x > self.min.x && x < self.max.x
+    }
+
+    #[inline]
+    pub fn vec_inside(&self, vec: Vec2<Float>) -> bool {
+        self.x_inside(vec.x) && self.y_inside(vec.y)
+    }
 }
 
 impl Default for AABB<Float> {

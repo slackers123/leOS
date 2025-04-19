@@ -1,8 +1,12 @@
+use corelib::types::Float;
+use drawlib::drawable::Drawable;
 use imgsave::Qimg;
 use mathlib::{
+    aabb::AABB,
     bezier::{CubicBezier, QuadraticBezier},
     elliptical_arc::EllipticalArc,
     horiz_line_intersect::HorizLineIntersect,
+    line_seg::LineSegment,
     vectors::Vec2,
 };
 
@@ -10,6 +14,11 @@ mod imgsave;
 // mod parsertest;
 
 fn main() {
+    let res = drawlib::stroking::stroke()
+        .into_iter()
+        .map(|v| (v.0.to_uint(), v.1.to_uint()))
+        .collect::<Vec<_>>();
+
     // let toks =
     //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
@@ -25,19 +34,27 @@ fn main() {
     // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
     // let font = ttflib::load_ttf(&source);
 
-    const WIDTH: u32 = 100;
-    const HEIGHT: u32 = 100;
-    const WIDTH2: u32 = WIDTH / 2;
-    const HEIGHT2: u32 = HEIGHT / 2;
+    const WIDTH: u32 = 1000;
+    const HEIGHT: u32 = 1000;
+    // const WIDTH2: u32 = WIDTH / 2;
+    // const HEIGHT2: u32 = HEIGHT / 2;
 
     let mut img = Qimg(image::ImageBuffer::new(WIDTH, HEIGHT));
 
-    let q = CubicBezier::new(
-        Vec2::new(10., 10.),
-        Vec2::new(10., 90.),
-        Vec2::new(90., 10.),
-        Vec2::new(90., 90.),
-    );
+    for i in 0..res.len() - 1 {
+        let tri1 = drawlib::ptri::PTri::new(res[i].0, res[i].1, res[i + 1].0);
+        let tri2 = drawlib::ptri::PTri::new(res[i].1, res[i + 1].0, res[i + 1].1);
+
+        tri1.draw(&mut img).unwrap();
+        tri2.draw(&mut img).unwrap();
+    }
+
+    // let q = CubicBezier::new(
+    //     Vec2::new(10., 10.),
+    //     Vec2::new(10., 90.),
+    //     Vec2::new(90., 10.),
+    //     Vec2::new(90., 90.),
+    // );
 
     // let arc = EllipticalArc {
     //     r: Vec2::new(10., 20.),
@@ -59,20 +76,36 @@ fn main() {
     //     angle_delta: PI,
     // };
 
-    for y in 0..WIDTH {
-        let roots = q.isect_at_y(y as f32);
+    // let l1 = LineSegment::new(Vec2::new(0., 10.), Vec2::new(90., 100.));
+    // let l2 = LineSegment::new(Vec2::new(10., 0.), Vec2::new(100., 90.));
 
-        for x in 0..HEIGHT {
-            let isects = roots.iter().filter(|r| **r < x as f32).count();
+    // let l3 = LineSegment::new(Vec2::new(0., 10.), Vec2::new(10., 0.));
+    // let l4 = LineSegment::new(Vec2::new(100., 90.), Vec2::new(90., 100.));
 
-            match isects {
-                0 => img.0.put_pixel(x, y, image::Rgba([0, 0, 0, 255])),
-                1 => img.0.put_pixel(x, y, image::Rgba([0, 255, 0, 255])),
-                2 => img.0.put_pixel(x, y, image::Rgba([0, 0, 255, 255])),
-                _ => img.0.put_pixel(x, y, image::Rgba([255, 0, 0, 255])),
-            }
-        }
-    }
+    // let segs = [l1, l2, l3, l4];
+
+    // let bboxes: Vec<AABB<Float>> = segs.iter().map(|s| s.bbox()).collect();
+
+    // for y in 0..HEIGHT {
+    //     let roots: Vec<Float> = segs
+    //         .iter()
+    //         .zip(bboxes.iter())
+    //         .filter(|s| s.1.y_inside(y as Float))
+    //         .map(|s| s.0.isect_at_y(y as Float))
+    //         .flatten()
+    //         .collect();
+
+    //     for x in 0..WIDTH {
+    //         let isects = roots.iter().filter(|r| **r < x as f32).count();
+
+    //         match isects {
+    //             0 => img.0.put_pixel(x, y, image::Rgba([0, 0, 0, 255])),
+    //             1 => img.0.put_pixel(x, y, image::Rgba([0, 255, 0, 255])),
+    //             2 => img.0.put_pixel(x, y, image::Rgba([0, 0, 255, 255])),
+    //             _ => img.0.put_pixel(x, y, image::Rgba([255, 0, 0, 255])),
+    //         }
+    //     }
+    // }
 
     img.0.save("out.png").unwrap();
 
