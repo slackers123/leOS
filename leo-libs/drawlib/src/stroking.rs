@@ -12,7 +12,119 @@ use mathlib::{
     vectors::Vec2,
 };
 
-enum PathSeg {
+use crate::{drawable::Drawable, ptri::PTri};
+
+pub enum JoinType {
+    None,
+    Miter,
+    Bevel,
+}
+
+pub struct Path {
+    pub segs: Vec<PathSeg>,
+    pub join_type: JoinType,
+    pub width: Float,
+}
+
+impl Drawable for Path {
+    fn draw(
+        &self,
+        target: &mut impl crate::draw_target::DrawTarget,
+    ) -> crate::rendererror::RenderResult<()> {
+        for (i, seg) in self.segs.iter().enumerate() {
+            let res = stroke(seg, self.width)
+                .into_iter()
+                .map(|v| (v.0.to_uint(), v.1.to_uint()))
+                .collect::<Vec<_>>();
+
+            for i in 0..res.len() - 1 {
+                let tri1 = PTri::new(res[i].0, res[i].1, res[i + 1].0);
+                let tri2 = PTri::new(res[i].1, res[i + 1].0, res[i + 1].1);
+
+                tri1.draw(target)?;
+                tri2.draw(target)?;
+            }
+
+            if self.segs.len() > 1 && i > 0 {
+                match self.join_type {
+                    JoinType::None => {}
+                    JoinType::Miter => {
+                        // x = p1x + t1 * d1x
+                        // x = p2x + t2 * d2x
+                        // y = p1y + t1 * d1y
+                        // y = p2y + t2 * d2y
+                        //
+                        // x = p1x + t1 * d1x
+                        // x / d1x - p1x / d1x = t1
+                        //
+                        // y = p1y + (x / d1x - p1x / d1x) * d1y
+                        // y = x * (d1y / d1x) + (p1y - p1x * d1y / d1x)
+                        // y = x * (d2y / d2x) + (p2y - p2x * d2y / d2x)
+                        //
+                        // a = (d1y / d1x) b = (p1y - p1x * d1y / d1x)
+                        // c = (d2y / d2x) d = (p2y - p2x * d2y / d2x)
+                        //
+                        // x = (d - b) / (a - c)
+                        // y = (a * d - b * c) / (a - c)
+
+                        let dir2 = seg.init_norm_grad();
+                        let dir1 = self.segs[i - 1].term_norm_grad();
+                        if dir1 == dir2 {
+                            continue;
+                        }
+                        let angle = dir2.angle_to(&dir1);
+
+                        let (p1, p2) = if angle > 0.0 {
+                            (seg.init_p(self.width), self.segs[i - 1].term_p(self.width))
+                        } else {
+                            (seg.init_n(self.width), self.segs[i - 1].term_n(self.width))
+                        };
+
+                        let a = dir2.y / dir2.x;
+                        let b = p1.y - p1.x * dir2.y / dir2.x;
+                        let c = dir1.y / dir1.x;
+                        let d = p2.y - p2.x * dir1.y / dir1.x;
+
+                        let x = (d - b) / (a - c);
+                        let y = (a * d - b * c) / (a - c);
+
+                        let p3 = Vec2::new(x, y);
+
+                        // FIXME: this is slightly off (rounding)
+
+                        PTri::new(p1.to_uint(), p2.to_uint(), p3.to_uint()).draw(target)?;
+
+                        let p3 = seg.generator(0.0);
+
+                        PTri::new(p1.to_uint(), p2.to_uint(), p3.to_uint()).draw(target)?;
+                    }
+                    JoinType::Bevel => {
+                        let angle = seg
+                            .init_norm_grad()
+                            .angle_to(&self.segs[i - 1].term_norm_grad());
+                        if angle == 0.0 {
+                            continue;
+                        }
+
+                        let (p1, p2) = if angle > 0.0 {
+                            (seg.init_p(self.width), self.segs[i - 1].term_p(self.width))
+                        } else {
+                            (seg.init_n(self.width), self.segs[i - 1].term_n(self.width))
+                        };
+
+                        let p3 = seg.generator(0.0);
+
+                        PTri::new(p1.to_uint(), p2.to_uint(), p3.to_uint()).draw(target)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub enum PathSeg {
     CubicBezier {
         P_A: Vec2<Float>,
         P_B: Vec2<Float>,
@@ -217,8 +329,6 @@ impl PathSeg {
                 ])
                 .det();
 
-                println!("{d1} {d2} {d3}");
-
                 let res = QuadraticEquation {
                     a: -3. * d1,
                     b: 3. * d2,
@@ -294,18 +404,42 @@ impl PathSeg {
             }
         }
     }
+
+    fn init_n(&self, w: f32) -> Vec2<Float> {
+        let r_N = w / 2.0;
+
+        let angle = self.init_norm_grad().x_angle();
+
+        self.generator(0.0) - Vec2::new(-angle.sin(), angle.cos()) * r_N
+    }
+
+    fn init_p(&self, w: f32) -> Vec2<Float> {
+        let r_P = w / 2.0;
+
+        let angle = self.init_norm_grad().x_angle();
+
+        self.generator(0.0) + Vec2::new(-angle.sin(), angle.cos()) * r_P
+    }
+
+    fn term_n(&self, w: f32) -> Vec2<Float> {
+        let r_N = w / 2.0;
+
+        let angle = self.term_norm_grad().x_angle();
+
+        self.generator(1.0) - Vec2::new(-angle.sin(), angle.cos()) * r_N
+    }
+
+    fn term_p(&self, w: f32) -> Vec2<Float> {
+        let r_P = w / 2.0;
+
+        let angle = self.term_norm_grad().x_angle();
+
+        self.generator(1.0) + Vec2::new(-angle.sin(), angle.cos()) * r_P
+    }
 }
 
-pub fn stroke() -> Vec<(Vec2<Float>, Vec2<Float>)> {
-    let seg = PathSeg::CubicBezier {
-        P_A: Vec2::new(0.0, 0.0),
-        P_B: Vec2::new(0.0, 1000.0),
-        P_C: Vec2::new(1000.0, 0.0),
-        P_D: Vec2::new(1000.0, 1000.0),
-    };
-
+pub fn stroke(seg: &PathSeg, w: Float) -> Vec<(Vec2<Float>, Vec2<Float>)> {
     let q = (5.0) / 180.0 * PI;
-    let w = 20.0;
 
     let (mut inflection_params, more_needed) = seg.inflections();
 
@@ -392,8 +526,8 @@ pub fn stroke() -> Vec<(Vec2<Float>, Vec2<Float>)> {
 
     let mut res = vec![];
     for j in 0..=N {
-        let g = seg.generator(t_of_j(j));
-        println!("({}, {})", g.x, g.y);
+        // let g = seg.generator(t_of_j(j));
+        // println!("({}, {})", g.x, g.y);
         let v1 = N_j(j);
         let v2 = P_j(j);
         // println!("({}, {})", v1.x, v1.y);
@@ -442,12 +576,12 @@ fn rel_angle_diff(theta_1: f32, theta_2: f32) -> f32 {
     }
 }
 
-fn angle_addition(theta_1: f32, theta_2: f32) -> f32 {
-    if (theta_1 + theta_2) > PI {
-        theta_1 + theta_2 - PI2
-    } else if (theta_1 + theta_2) < (-PI) {
-        theta_1 + theta_2 + PI2
-    } else {
-        theta_1 + theta_2
-    }
-}
+// fn angle_addition(theta_1: f32, theta_2: f32) -> f32 {
+//     if (theta_1 + theta_2) > PI {
+//         theta_1 + theta_2 - PI2
+//     } else if (theta_1 + theta_2) < (-PI) {
+//         theta_1 + theta_2 + PI2
+//     } else {
+//         theta_1 + theta_2
+//     }
+// }

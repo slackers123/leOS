@@ -1,5 +1,8 @@
 use corelib::types::Float;
-use drawlib::drawable::Drawable;
+use drawlib::{
+    drawable::Drawable,
+    stroking::{JoinType, Path, PathSeg},
+};
 use imgsave::Qimg;
 use mathlib::{
     aabb::AABB,
@@ -14,11 +17,6 @@ mod imgsave;
 // mod parsertest;
 
 fn main() {
-    let res = drawlib::stroking::stroke()
-        .into_iter()
-        .map(|v| (v.0.to_uint(), v.1.to_uint()))
-        .collect::<Vec<_>>();
-
     // let toks =
     //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
@@ -41,14 +39,22 @@ fn main() {
 
     let mut img = Qimg(image::ImageBuffer::new(WIDTH, HEIGHT));
 
-    for i in 0..res.len() - 1 {
-        let tri1 = drawlib::ptri::PTri::new(res[i].0, res[i].1, res[i + 1].0);
-        let tri2 = drawlib::ptri::PTri::new(res[i].1, res[i + 1].0, res[i + 1].1);
+    let path = Path {
+        segs: vec![
+            PathSeg::Line {
+                P_A: Vec2::new(0.0, 0.0),
+                P_B: Vec2::new(500.0, 500.0),
+            },
+            PathSeg::Line {
+                P_A: Vec2::new(500.0, 500.0),
+                P_B: Vec2::new(1000.0, 0.0),
+            },
+        ],
+        join_type: JoinType::Miter,
+        width: 20.0,
+    };
 
-        tri1.draw(&mut img).unwrap();
-        tri2.draw(&mut img).unwrap();
-    }
-
+    path.draw(&mut img).unwrap();
     // let q = CubicBezier::new(
     //     Vec2::new(10., 10.),
     //     Vec2::new(10., 90.),
