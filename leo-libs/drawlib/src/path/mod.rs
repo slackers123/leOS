@@ -1,5 +1,5 @@
 use corelib::types::Float;
-use mathlib::{aabb::AABB, color::ColA, vectors::Vec2};
+use mathlib::{aabb::AABB, color::ColA, elliptical_arc::EllipticalArc, vectors::Vec2};
 
 pub mod path_drawable;
 
@@ -34,6 +34,18 @@ impl Path {
         self.path_segs.push(PathSeg::LineTo);
         self.vals.push(target.x);
         self.vals.push(target.y);
+    }
+
+    pub fn hline_to(&mut self, x: Float) {
+        let last = self.vals.len() - 1;
+
+        self.line_to(Vec2::new(x, self.vals[last]));
+    }
+
+    pub fn vline_to(&mut self, y: Float) {
+        let last = self.vals.len() - 2;
+
+        self.line_to(Vec2::new(self.vals[last], y));
     }
 
     pub fn q_bezier_to(&mut self, control: Vec2<Float>, target: Vec2<Float>) {
@@ -100,6 +112,68 @@ impl Path {
             val_index: 0,
             seg_idx: 0,
             path: &self,
+        }
+    }
+
+    pub fn to_drawable(&self) -> crate::stroking::Path {
+        let mut last = Vec2::ZERO;
+        let segs = self
+            .segs_iter()
+            .flat_map(|s| {
+                let res = match s {
+                    CompletePathSeg::MoveTo(t) => {
+                        last = t;
+                        None
+                    }
+                    CompletePathSeg::LineTo(t) => {
+                        Some(crate::stroking::PathSeg::Line { P_A: last, P_B: t })
+                    }
+
+                    CompletePathSeg::ClosePath => {
+                        None // TODO: actually do something
+                    }
+                    CompletePathSeg::CBezierTo(b, c, d) => {
+                        Some(crate::stroking::PathSeg::CubicBezier {
+                            P_A: last,
+                            P_B: b,
+                            P_C: c,
+                            P_D: d,
+                        })
+                    }
+                    CompletePathSeg::QBezierTo(b, c) => {
+                        Some(crate::stroking::PathSeg::QuadraticBezier {
+                            P_A: last,
+                            P_B: b,
+                            P_C: c,
+                        })
+                    }
+                    CompletePathSeg::ArcTo(r, rot, large_arc_flag, sweep_flag, end) => {
+                        Some(crate::stroking::PathSeg::from_elliptical(
+                            EllipticalArc {
+                                start: last,
+                                r,
+                                rot,
+                                large_arc_flag: large_arc_flag == 1.0, // FIXME: this is not exhaustive
+                                sweep_flag: sweep_flag == 1.0,
+                                end,
+                            }
+                            .to_equation(),
+                        ))
+                    }
+                };
+                if res.is_some() {
+                    last = s.get_target();
+                }
+
+                res
+            })
+            .collect::<Vec<_>>();
+
+        crate::stroking::Path {
+            // TODO: make these actual parameters
+            segs,
+            join_type: crate::stroking::JoinType::None,
+            width: 10.0,
         }
     }
 }

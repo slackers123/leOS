@@ -112,12 +112,16 @@ pub struct EllipticalArcEquation {
 }
 
 impl EllipticalArcEquation {
-    pub fn get_pos_from_angle(&self, angle: Float) -> Vec2<Float> {
+    pub fn get_pos_from_angle(&self, angle: Rad) -> Vec2<Float> {
         Vec2::from_mat(
             Fmat2::new([
                 [self.rot.cos(), -self.rot.sin()],
                 [self.rot.sin(), self.rot.cos()],
-            ]) * Vec2::new(self.r.x * angle.cos(), self.r.y * angle.sin()).to_mat()
+            ]) * Vec2::new(
+                self.r.x * angle.as_float().cos(),
+                self.r.y * angle.as_float().sin(),
+            )
+            .to_mat()
                 + self.c.to_mat(),
         )
     }
@@ -134,6 +138,31 @@ impl EllipticalArcEquation {
         );
         let angle = new_pos.y.atan2(new_pos.x);
         Rad::new(angle)
+    }
+
+    pub fn tangent(&self, theta: Float) -> Vec2<Float> {
+        let sin_theta = theta.sin();
+        let cos_theta = theta.cos();
+        let sin_psi = self.rot.sin();
+        let cos_psi = self.rot.cos();
+        let int = Vec2::new(
+            -cos_psi * self.r.x * sin_theta - sin_psi * self.r.y * cos_theta,
+            -sin_psi * self.r.x * sin_theta + cos_psi * self.r.y * cos_theta,
+        );
+
+        if int.length() == 0.0 {
+            return Vec2::ZERO;
+        }
+
+        (int / int.length()) * self.angle_delta.signum()
+    }
+
+    pub fn initial_tangent(&self) -> Vec2<Float> {
+        self.tangent(self.start_angle.as_float())
+    }
+
+    pub fn terminal_tangent(&self) -> Vec2<Float> {
+        self.tangent(self.start_angle.as_float() + self.angle_delta)
     }
 }
 

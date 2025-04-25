@@ -5,19 +5,27 @@ use std::{f32::consts::PI, usize};
 
 use corelib::types::Float;
 use mathlib::{
-    angles::PI2,
+    angles::{Rad, PI2},
+    elliptical_arc::EllipticalArcEquation,
     equations::{EquationRoots, QuadraticEquation},
     funcs::approx_in_range_01,
+    intersect::intersect_two_lines,
     matrix::Mat,
     vectors::Vec2,
 };
 
 use crate::{drawable::Drawable, ptri::PTri};
 
+pub const QUALITY_DEG: Float = 10.0;
+const QUALITY: Float = QUALITY_DEG / 180.0 * PI;
+
 pub enum JoinType {
     None,
     Miter,
     Bevel,
+    Round,
+    MiterTruncate(Float),
+    MiterRevert(Float),
 }
 
 pub struct Path {
@@ -34,7 +42,7 @@ impl Drawable for Path {
         for (i, seg) in self.segs.iter().enumerate() {
             let res = stroke(seg, self.width)
                 .into_iter()
-                .map(|v| (v.0.to_uint(), v.1.to_uint()))
+                .map(|v| (v.0, v.1))
                 .collect::<Vec<_>>();
 
             for i in 0..res.len() - 1 {
@@ -46,76 +54,56 @@ impl Drawable for Path {
             }
 
             if self.segs.len() > 1 && i > 0 {
+                let dir2 = seg.init_norm_grad();
+                let dir1 = self.segs[i - 1].term_norm_grad();
+                if dir1 == dir2 {
+                    continue;
+                }
+                let angle = dir2.angle_to(&dir1);
+
+                let (p1, p2) = if angle > 0.0 {
+                    (seg.init_p(self.width), self.segs[i - 1].term_p(self.width))
+                } else {
+                    (seg.init_n(self.width), self.segs[i - 1].term_n(self.width))
+                };
+
                 match self.join_type {
                     JoinType::None => {}
                     JoinType::Miter => {
-                        // x = p1x + t1 * d1x
-                        // x = p2x + t2 * d2x
-                        // y = p1y + t1 * d1y
-                        // y = p2y + t2 * d2y
-                        //
-                        // x = p1x + t1 * d1x
-                        // x / d1x - p1x / d1x = t1
-                        //
-                        // y = p1y + (x / d1x - p1x / d1x) * d1y
-                        // y = x * (d1y / d1x) + (p1y - p1x * d1y / d1x)
-                        // y = x * (d2y / d2x) + (p2y - p2x * d2y / d2x)
-                        //
-                        // a = (d1y / d1x) b = (p1y - p1x * d1y / d1x)
-                        // c = (d2y / d2x) d = (p2y - p2x * d2y / d2x)
-                        //
-                        // x = (d - b) / (a - c)
-                        // y = (a * d - b * c) / (a - c)
-
-                        let dir2 = seg.init_norm_grad();
-                        let dir1 = self.segs[i - 1].term_norm_grad();
-                        if dir1 == dir2 {
-                            continue;
-                        }
-                        let angle = dir2.angle_to(&dir1);
-
-                        let (p1, p2) = if angle > 0.0 {
-                            (seg.init_p(self.width), self.segs[i - 1].term_p(self.width))
-                        } else {
-                            (seg.init_n(self.width), self.segs[i - 1].term_n(self.width))
-                        };
-
-                        let a = dir2.y / dir2.x;
-                        let b = p1.y - p1.x * dir2.y / dir2.x;
-                        let c = dir1.y / dir1.x;
-                        let d = p2.y - p2.x * dir1.y / dir1.x;
-
-                        let x = (d - b) / (a - c);
-                        let y = (a * d - b * c) / (a - c);
-
-                        let p3 = Vec2::new(x, y);
+                        let p3 = intersect_two_lines(p1, dir1, p2, dir2).unwrap();
 
                         // FIXME: this is slightly off (rounding)
 
-                        PTri::new(p1.to_uint(), p2.to_uint(), p3.to_uint()).draw(target)?;
+                        PTri::new(p1, p2, p3).draw(target)?;
 
                         let p3 = seg.generator(0.0);
 
-                        PTri::new(p1.to_uint(), p2.to_uint(), p3.to_uint()).draw(target)?;
+                        PTri::new(p1, p2, p3).draw(target)?;
                     }
                     JoinType::Bevel => {
-                        let angle = seg
-                            .init_norm_grad()
-                            .angle_to(&self.segs[i - 1].term_norm_grad());
-                        if angle == 0.0 {
-                            continue;
-                        }
-
-                        let (p1, p2) = if angle > 0.0 {
-                            (seg.init_p(self.width), self.segs[i - 1].term_p(self.width))
-                        } else {
-                            (seg.init_n(self.width), self.segs[i - 1].term_n(self.width))
-                        };
-
                         let p3 = seg.generator(0.0);
 
-                        PTri::new(p1.to_uint(), p2.to_uint(), p3.to_uint()).draw(target)?;
+                        PTri::new(p1, p2, p3).draw(target)?;
                     }
+
+                    JoinType::Round => {
+                        let J = (angle / QUALITY).ceil() as usize;
+
+                        let center = seg.generator(0.0);
+
+                        let mut last = p1;
+                        for i in 1..=J {
+                            let t = i as Float / J as Float;
+                            let n_angle = dir1.x_angle() + (angle * t);
+                            let new = Vec2::dir(n_angle) * (self.width / 2.0);
+                            PTri::new(last, center, center + new).draw(target)?;
+                            last = new;
+                        }
+                        println!("{:?}", p1);
+                    }
+                    _ => todo!(
+                        "only 'none', 'miter', 'bevel', and 'round' are supported as join types"
+                    ),
                 }
             }
         }
@@ -149,6 +137,20 @@ pub enum PathSeg {
 }
 
 impl PathSeg {
+    pub fn from_elliptical(eq: EllipticalArcEquation) -> Self {
+        let P_A = eq.get_pos_from_angle(eq.start_angle);
+        let P_C = eq.get_pos_from_angle(Rad::new(eq.start_angle.as_float() + eq.angle_delta));
+
+        let t1 = eq.initial_tangent();
+        let t2 = eq.terminal_tangent();
+
+        let P_B = intersect_two_lines(P_A, t1, P_C, t2).unwrap(); // FIXME: handle the exact half circles
+
+        let w_B = (eq.angle_delta / 2.0).cos();
+
+        Self::Conic { P_A, P_B, P_C, w_B }
+    }
+
     fn generator(&self, t: Float) -> Vec2<Float> {
         match self {
             Self::CubicBezier { P_A, P_B, P_C, P_D } => {
@@ -439,7 +441,7 @@ impl PathSeg {
 }
 
 pub fn stroke(seg: &PathSeg, w: Float) -> Vec<(Vec2<Float>, Vec2<Float>)> {
-    let q = (5.0) / 180.0 * PI;
+    let q = QUALITY;
 
     let (mut inflection_params, more_needed) = seg.inflections();
 
@@ -526,23 +528,10 @@ pub fn stroke(seg: &PathSeg, w: Float) -> Vec<(Vec2<Float>, Vec2<Float>)> {
 
     let mut res = vec![];
     for j in 0..=N {
-        // let g = seg.generator(t_of_j(j));
-        // println!("({}, {})", g.x, g.y);
         let v1 = N_j(j);
         let v2 = P_j(j);
-        // println!("({}, {})", v1.x, v1.y);
-        // println!("({}, {})", v2.x, v2.y);
         res.push((v1, v2));
     }
-
-    // println!("stuff:");
-    // println!("p_i: {p_i:?}");
-    // println!("cpsi_i: {cpsi_i:?}");
-    // println!("delta_i: {delta_i:?}");
-    // println!("cdelta_sum_of_k: {cdelta_sum_of_k:?}");
-    // println!("N: {N}");
-    // println!("M: {M}");
-    // println!("{:?}", seg.init_norm_grad().x_angle());
 
     res
 }

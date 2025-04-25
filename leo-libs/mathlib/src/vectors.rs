@@ -94,6 +94,13 @@ impl Vec2<Float> {
             self.y.clamp(0.0, Float::MAX) as Uint,
         )
     }
+
+    pub fn dir(angle: Float) -> Self {
+        Vec2 {
+            x: angle.cos(),
+            y: angle.sin(),
+        }
+    }
 }
 
 impl<T: Number> ops::Sub<Vec2<T>> for Vec2<T> {

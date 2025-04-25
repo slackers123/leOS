@@ -1,17 +1,10 @@
-use corelib::types::Float;
 use drawlib::{
     drawable::Drawable,
+    primitives::rect::Rect,
     stroking::{JoinType, Path, PathSeg},
 };
 use imgsave::Qimg;
-use mathlib::{
-    aabb::AABB,
-    bezier::{CubicBezier, QuadraticBezier},
-    elliptical_arc::EllipticalArc,
-    horiz_line_intersect::HorizLineIntersect,
-    line_seg::LineSegment,
-    vectors::Vec2,
-};
+use mathlib::vectors::Vec2;
 
 mod imgsave;
 // mod parsertest;
@@ -40,21 +33,22 @@ fn main() {
     let mut img = Qimg(image::ImageBuffer::new(WIDTH, HEIGHT));
 
     let path = Path {
-        segs: vec![
-            PathSeg::Line {
-                P_A: Vec2::new(0.0, 0.0),
-                P_B: Vec2::new(500.0, 500.0),
-            },
-            PathSeg::Line {
-                P_A: Vec2::new(500.0, 500.0),
-                P_B: Vec2::new(1000.0, 0.0),
-            },
-        ],
-        join_type: JoinType::Miter,
+        segs: vec![PathSeg::Conic {
+            P_A: Vec2::new(0.0, 0.0),
+            P_B: Vec2::new(0.0, 500.0),
+            P_C: Vec2::new(500.0, 500.0),
+            w_B: -1.0,
+        }],
+        join_type: JoinType::Round,
         width: 20.0,
     };
 
     path.draw(&mut img).unwrap();
+
+    let rect = Rect::new(500.0, 500.0, 100.0, 100., 20.0, 20.0);
+
+    rect.draw(&mut img).unwrap();
+
     // let q = CubicBezier::new(
     //     Vec2::new(10., 10.),
     //     Vec2::new(10., 90.),

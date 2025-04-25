@@ -4,50 +4,8 @@ use super::Path;
 
 impl Drawable for Path {
     fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) -> RenderResult<()> {
-        // println!("{:?}", self.bbox);
-        let bbox_max = self.bbox.max + self.pos;
-        let bbox_min = self.bbox.min + self.pos;
-        todo!();
-        // for y in bbox_min.y as usize..bbox_max.y as usize {
-        //     for x in bbox_min.x as usize..bbox_max.x as usize {
-        //         let mut count = 0;
-        //         let segs = self.segs_iter();
-        //         let mut first = None;
-        //         let mut last = Vec2::ZERO;
-        //         let mut initial_point = Vec2::ZERO;
-        //         for seg in segs {
-        //             if first.is_none() {
-        //                 first = Some(seg.clone());
-        //             }
-        //             let test_point = Vec2::new(x as Float, y as Float);
-        //             count += match seg {
-        //                 CompletePathSeg::MoveTo(t) => {
-        //                     initial_point = t;
-        //                     0
-        //                 }
-        //                 CompletePathSeg::LineTo(t) => {
-        //                     LineSegment::new(last, t).isect_at_y(test_point.y)
-        //                 }
-        //                 CompletePathSeg::QBezierTo(p1, p2) => {
-        //                     QuadraticBezier::new(last, p1, p2).isect_at_y(test_point.y)
-        //                 }
-        //                 CompletePathSeg::CBezierTo(p1, p2, p3) => {
-        //                     CubicBezier::new(last, p1, p2, p3).isect_at_y(test_point.y)
-        //                 }
-        //                 CompletePathSeg::ClosePath => {
-        //                     LineSegment::new(last, initial_point).isect_at_y(test_point.y)
-        //                 }
-        //                 _ => todo!("implement {seg:?}"),
-        //             };
-        //             last = seg.get_target();
-        //         }
-        //         // println!("{count}");
-        //         if count % 2 == 1 {
-        //             target.put_pixel(Vec2::new(x as Uint, y as Uint), self.col)?;
-        //         }
-        //     }
-        // }
-        // Ok(())
+        // TODO: filling here
+        self.to_drawable().draw(target)
     }
 }
 

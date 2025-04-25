@@ -1,4 +1,4 @@
-use corelib::types::Uint;
+use corelib::types::{Float, Uint};
 use mathlib::{color::ColA, vectors::Vec2};
 
 use crate::drawable::Drawable;
@@ -7,13 +7,13 @@ use crate::drawable::Drawable;
 ///
 /// It is used internally to render almost everything
 pub struct PTri {
-    pub a: Vec2<Uint>,
-    pub b: Vec2<Uint>,
-    pub c: Vec2<Uint>,
+    pub a: Vec2<Float>,
+    pub b: Vec2<Float>,
+    pub c: Vec2<Float>,
 }
 
 impl PTri {
-    pub fn new(a: Vec2<Uint>, b: Vec2<Uint>, c: Vec2<Uint>) -> Self {
+    pub fn new(a: Vec2<Float>, b: Vec2<Float>, c: Vec2<Float>) -> Self {
         Self { a, b, c }
     }
 }
@@ -24,15 +24,14 @@ impl Drawable for PTri {
         target: &mut impl crate::draw_target::DrawTarget,
     ) -> crate::rendererror::RenderResult<()> {
         // Ensure the triangle vertices are in clockwise order
-        let cross_product = (self.b.x as i32 - self.a.x as i32)
-            * (self.c.y as i32 - self.a.y as i32)
-            - (self.b.y as i32 - self.a.y as i32) * (self.c.x as i32 - self.a.x as i32);
+        let cross_product = (self.b.x - self.a.x) * (self.c.y - self.a.y)
+            - (self.b.y - self.a.y) * (self.c.x - self.a.x);
 
         let tria = self.a;
         let mut trib = self.b;
         let mut tric = self.c;
 
-        if cross_product < 0 {
+        if cross_product < 0.0 {
             // Swap b and c to make the order clockwise
             let temp = trib;
             trib = tric;
@@ -44,18 +43,22 @@ impl Drawable for PTri {
         let min_y = tria.y.min(trib.y).min(tric.y);
         let max_y = tria.y.max(trib.y).max(tric.y);
 
-        for y in min_y..=max_y {
-            for x in min_x..=max_x {
-                let p = Vec2::new(x, y);
+        let dims = target.dimensions();
 
-                let edge1 = (trib.x as i32 - tria.x as i32) * (p.y as i32 - tria.y as i32)
-                    - (trib.y as i32 - tria.y as i32) * (p.x as i32 - tria.x as i32);
-                let edge2 = (tric.x as i32 - trib.x as i32) * (p.y as i32 - trib.y as i32)
-                    - (tric.y as i32 - trib.y as i32) * (p.x as i32 - trib.x as i32);
-                let edge3 = (tria.x as i32 - tric.x as i32) * (p.y as i32 - tric.y as i32)
-                    - (tria.y as i32 - tric.y as i32) * (p.x as i32 - tric.x as i32);
+        let min_x = min_x.clamp(0.0, dims.0 as Float);
+        let max_x = max_x.clamp(0.0, dims.0 as Float);
+        let min_y = min_y.clamp(0.0, dims.1 as Float);
+        let max_y = max_y.clamp(0.0, dims.1 as Float);
 
-                if edge1 >= 0 && edge2 >= 0 && edge3 >= 0 {
+        for y in min_y as Uint..=max_y as Uint {
+            for x in min_x as Uint..=max_x as Uint {
+                let p = Vec2::new(x as Float, y as Float);
+
+                let edge1 = (trib.x - tria.x) * (p.y - tria.y) - (trib.y - tria.y) * (p.x - tria.x);
+                let edge2 = (tric.x - trib.x) * (p.y - trib.y) - (tric.y - trib.y) * (p.x - trib.x);
+                let edge3 = (tria.x - tric.x) * (p.y - tric.y) - (tria.y - tric.y) * (p.x - tric.x);
+
+                if edge1 >= 0.0 && edge2 >= 0.0 && edge3 >= 0.0 {
                     target.put_pixel(Vec2::new(x, y), ColA::BLUE).unwrap();
                 }
             }

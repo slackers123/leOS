@@ -17,4 +17,10 @@ impl DrawTarget for Qimg {
         }
         Ok(())
     }
+    fn dimensions(&self) -> (usize, usize) {
+        (
+            self.0.dimensions().0 as usize,
+            self.0.dimensions().1 as usize,
+        )
+    }
 }
