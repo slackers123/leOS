@@ -4,7 +4,7 @@ use super::Path;
 
 impl Drawable for Path {
     fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) -> RenderResult<()> {
-        // TODO: filling here
+        // TODO: path filling here
         self.to_drawable().draw(target)
     }
 }

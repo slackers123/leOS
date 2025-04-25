@@ -14,6 +14,8 @@ pub fn intersect_two_lines(
 ) -> Option<Vec2<Float>> {
     // adapted from: https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
 
+    println!("{dir1:?}, {dir2:?}");
+
     let a = p1;
     let b = p1 + dir1;
     let c = p2;

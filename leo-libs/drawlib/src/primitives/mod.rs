@@ -1,7 +1,6 @@
-use corelib::types::Float;
-
+pub mod circle;
+pub mod ellipse;
+pub mod line;
+pub mod polygon;
+pub mod polyline;
 pub mod rect;
-
-pub struct Stroke {
-    stroke_width: Float,
-}
