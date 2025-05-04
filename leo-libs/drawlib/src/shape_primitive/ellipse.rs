@@ -31,10 +31,7 @@ impl Ellipse {
 }
 
 impl Drawable for Ellipse {
-    fn draw(
-        &self,
-        target: &mut impl crate::draw_target::DrawTarget,
-    ) -> crate::rendererror::RenderResult<()> {
+    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
         self.0.draw(target)
     }
 }

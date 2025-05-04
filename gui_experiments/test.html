@@ -1,26 +1,58 @@
-<p>
+<!doctype html>
+<html>
     <head>
-        <script src="test.js"></script>
-    </head>
-    <svg width="320" height="320" xmlns="http://www.w3.org/2000/svg">
-        <path
-            id="path"
-            d="M 10 315
-           L 110 215
-           A 30 50 0 0 1 162.55 162.45
-           L 315 10"
-            stroke="black"
-            fill="green"
-            stroke-width="2"
-            fill-opacity="0.5"
-        />
-    </svg>
-</p>
+        <style>
+            * {
+                padding: 0;
+                margin: 0;
+            }
+            body {
+                width: 100%;
+                height: 100%;
+            }
 
-<p>rx <input id="rx" type="range" /></p>
-<p>ry <input id="ry" type="range" /></p>
-<p>x-axis-rotation <input id="x-axis-rotation" type="range" /></p>
-<p>large-arc-flag <input id="large-arc-flag" type="checkbox" /></p>
-<p>sweep-flag <input id="sweep-flag" type="checkbox" /></p>
-<p>x <input id="x" type="range" /></p>
-<p>y <input id="y" type="range" /></p>
+            #dock {
+                position: absolute;
+                bottom: 0;
+                left: 10vw;
+                width: 80vw;
+                height: 70px;
+                background: gray;
+            }
+
+            .window {
+                position: absolute;
+            }
+            .window::before {
+                margin-top: -30px;
+                height: 30px;
+                width: 100%;
+                background: gray;
+                display: block;
+                content: url("./buttons.svg") "Browser";
+            }
+
+            #cm {
+                height: 10px;
+                width: 1cm;
+                background: green;
+            }
+            #px {
+                height: 10px;
+                width: 32px;
+                background: red;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="cm"></div>
+        <div id="px"></div>
+        <div class="window" style="top: 20vh; left: 10vw">
+            <div
+                class="window-content"
+                style="width: 400px; height: 300px; background: green"
+            ></div>
+        </div>
+        <div id="dock"></div>
+    </body>
+</html>

@@ -23,3 +23,5 @@ only things that exist are:
 - gui_experiments: native bootstrapping for testing drawlib etc.
 
 [![brainmade.org](https://raw.githubusercontent.com/0atman/BrainMade-org/refs/heads/main/docs/white-logo.svg)](https://brainmade.org)
+
+gui application -> guilib: layed out primitives -> drawlib: triangles, vertex strips, materials -> renderlib: final image (platform specific/software renderer)

@@ -2,7 +2,7 @@ use std::io::Lines;
 
 use drawlib::{
     drawable::Drawable,
-    primitives::{circle::Circle, ellipse::Ellipse, line::Line, rect::Rect},
+    shape_primitive::{circle::Circle, ellipse::Ellipse, line::Line, rect::Rect},
     stroking::{JoinType, Path, PathSeg},
 };
 use imgsave::Qimg;
@@ -12,8 +12,9 @@ mod imgsave;
 // mod parsertest;
 
 fn main() {
-    // let toks =
-    //     htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
+    guilib::gui_test();
+
+    // let toks = htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
 
     // let regex = regexlib::Regex::new(r"a{4,}");
@@ -27,16 +28,16 @@ fn main() {
     // let source = std::fs::read("../test-data/Roboto-Regular.ttf").unwrap();
     // let font = ttflib::load_ttf(&source);
 
-    const WIDTH: u32 = 1000;
-    const HEIGHT: u32 = 1000;
+    // const WIDTH: u32 = 1000;
+    // const HEIGHT: u32 = 1000;
     // const WIDTH2: u32 = WIDTH / 2;
     // const HEIGHT2: u32 = HEIGHT / 2;
 
-    let mut img = Qimg(image::ImageBuffer::new(WIDTH, HEIGHT));
+    // let mut img = Qimg(image::ImageBuffer::new(WIDTH, HEIGHT));
 
-    let rect = Line::new(500.0, 500.0, 100.0, 50.0);
+    // let rect = Line::new(500.0, 500.0, 100.0, 50.0);
 
-    rect.draw(&mut img).unwrap();
+    // rect.draw(&mut img);
 
     // let q = CubicBezier::new(
     //     Vec2::new(10., 10.),
@@ -96,7 +97,7 @@ fn main() {
     //     }
     // }
 
-    img.0.save("out.png").unwrap();
+    // img.0.save("out.png").unwrap();
 
     // let mut p = Path::new();
     // p.move_to(Vec2::new(0., 0.));

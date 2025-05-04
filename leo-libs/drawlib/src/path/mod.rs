@@ -1,14 +1,15 @@
 use corelib::types::Float;
-use mathlib::{aabb::AABB, color::ColA, elliptical_arc::EllipticalArc, vectors::Vec2};
+use mathlib::{aabb::AABB, elliptical_arc::EllipticalArc, vectors::Vec2};
 
 pub mod path_drawable;
+
+pub mod builder;
 
 pub struct Path {
     pub pos: Vec2<Float>,
     path_segs: Vec<PathSeg>,
     vals: Vec<Float>,
     bbox: AABB<Float>,
-    col: ColA,
 }
 
 impl Path {
@@ -18,7 +19,6 @@ impl Path {
             path_segs: Vec::new(),
             vals: Vec::new(),
             bbox: AABB::default(),
-            col: ColA::WHITE,
         }
     }
 
@@ -115,7 +115,7 @@ impl Path {
         }
     }
 
-    pub fn to_drawable(&self) -> crate::stroking::Path {
+    pub fn to_stroke_path(&self) -> crate::stroking::Path {
         let mut last = Vec2::ZERO;
         let segs = self
             .segs_iter()

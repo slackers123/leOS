@@ -4,6 +4,8 @@ use corelib::types::{Float, Uint};
 
 use crate::{matrix::Mat, number::Number};
 
+pub type Vec2F = Vec2<Float>;
+
 #[derive(Copy, PartialEq, Debug, Clone)]
 pub struct Vec2<T: Number> {
     pub x: T,

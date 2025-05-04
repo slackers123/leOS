@@ -1,5 +1,5 @@
-use crate::{draw_target::DrawTarget, rendererror::RenderResult};
+use crate::draw_target::DrawTarget;
 
 pub trait Drawable {
-    fn draw(&self, target: &mut impl DrawTarget) -> RenderResult<()>;
+    fn draw(&self, target: &mut impl DrawTarget);
 }

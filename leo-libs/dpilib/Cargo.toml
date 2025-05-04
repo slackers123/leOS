@@ -1,0 +1,7 @@
+[package]
+name = "dpilib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+corelib = {path = "../corelib"}

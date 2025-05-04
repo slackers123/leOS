@@ -11,4 +11,5 @@ pub mod intersect;
 pub mod line_seg;
 pub mod matrix;
 pub mod number;
+pub mod triangle;
 pub mod vectors;

@@ -1,11 +1,11 @@
-use crate::{drawable::Drawable, rendererror::RenderResult};
+use crate::drawable::Drawable;
 
 use super::Path;
 
 impl Drawable for Path {
-    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) -> RenderResult<()> {
+    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
         // TODO: path filling here
-        self.to_drawable().draw(target)
+        self.to_stroke_path().draw(target)
     }
 }
 

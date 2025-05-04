@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-//! Based on: https://dl.acm.org/doi/abs/10.1145/3386569.3392458
+//! Based on Polar Stroking: https://dl.acm.org/doi/abs/10.1145/3386569.3392458
 
 use std::{f32::consts::PI, usize};
 
@@ -19,6 +19,7 @@ use crate::{drawable::Drawable, ptri::PTri};
 pub const QUALITY_DEG: Float = 10.0;
 const QUALITY: Float = QUALITY_DEG / 180.0 * PI;
 
+#[derive(Debug)]
 pub enum JoinType {
     None,
     Miter,
@@ -35,10 +36,7 @@ pub struct Path {
 }
 
 impl Drawable for Path {
-    fn draw(
-        &self,
-        target: &mut impl crate::draw_target::DrawTarget,
-    ) -> crate::rendererror::RenderResult<()> {
+    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
         for (i, seg) in self.segs.iter().enumerate() {
             let res = stroke(seg, self.width)
                 .into_iter()
@@ -49,8 +47,8 @@ impl Drawable for Path {
                 let tri1 = PTri::new(res[i].0, res[i].1, res[i + 1].0);
                 let tri2 = PTri::new(res[i].1, res[i + 1].0, res[i + 1].1);
 
-                tri1.draw(target)?;
-                tri2.draw(target)?;
+                tri1.draw(target);
+                tri2.draw(target);
             }
 
             if self.segs.len() > 1 && i > 0 {
@@ -74,16 +72,16 @@ impl Drawable for Path {
 
                         // FIXME: this is slightly off (rounding)
 
-                        PTri::new(p1, p2, p3).draw(target)?;
+                        PTri::new(p1, p2, p3).draw(target);
 
                         let p3 = seg.generator(0.0);
 
-                        PTri::new(p1, p2, p3).draw(target)?;
+                        PTri::new(p1, p2, p3).draw(target);
                     }
                     JoinType::Bevel => {
                         let p3 = seg.generator(0.0);
 
-                        PTri::new(p1, p2, p3).draw(target)?;
+                        PTri::new(p1, p2, p3).draw(target);
                     }
 
                     JoinType::Round => {
@@ -96,7 +94,7 @@ impl Drawable for Path {
                             let t = i as Float / J as Float;
                             let n_angle = dir1.x_angle() + (angle * t);
                             let new = Vec2::dir(n_angle) * (self.width / 2.0);
-                            PTri::new(last, center, center + new).draw(target)?;
+                            PTri::new(last, center, center + new).draw(target);
                             last = new;
                         }
                         println!("{:?}", p1);
@@ -107,8 +105,6 @@ impl Drawable for Path {
                 }
             }
         }
-
-        Ok(())
     }
 }
 

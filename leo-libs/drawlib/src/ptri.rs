@@ -19,10 +19,7 @@ impl PTri {
 }
 
 impl Drawable for PTri {
-    fn draw(
-        &self,
-        target: &mut impl crate::draw_target::DrawTarget,
-    ) -> crate::rendererror::RenderResult<()> {
+    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
         // Ensure the triangle vertices are in clockwise order
         let cross_product = (self.b.x - self.a.x) * (self.c.y - self.a.y)
             - (self.b.y - self.a.y) * (self.c.x - self.a.x);
@@ -59,11 +56,9 @@ impl Drawable for PTri {
                 let edge3 = (tria.x - tric.x) * (p.y - tric.y) - (tria.y - tric.y) * (p.x - tric.x);
 
                 if edge1 >= 0.0 && edge2 >= 0.0 && edge3 >= 0.0 {
-                    target.put_pixel(Vec2::new(x, y), ColA::BLUE).unwrap();
+                    target.put_pixel(Vec2::new(x, y), ColA::BLUE);
                 }
             }
         }
-
-        Ok(())
     }
 }

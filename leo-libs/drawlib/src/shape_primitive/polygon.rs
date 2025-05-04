@@ -29,10 +29,7 @@ impl Polygon {
 }
 
 impl Drawable for Polygon {
-    fn draw(
-        &self,
-        target: &mut impl crate::draw_target::DrawTarget,
-    ) -> crate::rendererror::RenderResult<()> {
-        self.0.draw(target)
+    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
+        self.0.draw(target);
     }
 }

@@ -1,8 +1,9 @@
 pub mod draw_target;
 pub mod drawable;
 pub mod path;
-pub mod primitives;
+pub mod path_attr;
+pub mod primitive;
 pub mod ptri;
-pub mod rendererror;
+pub mod shape_primitive;
 pub mod stroking;
 pub mod text;

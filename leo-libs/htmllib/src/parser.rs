@@ -6,7 +6,7 @@ use crate::{
     tokenzier::Token,
 };
 
-pub struct Parser {
+pub struct Parser<'context> {
     script_nesting_level: usize,
     parser_pause_flag: bool,
     insertion_mode: InsertionMode,
@@ -19,22 +19,98 @@ pub struct Parser {
     scripting_flag: bool,
     frameset_ok_flag: bool,
     foster_parenting: bool,
+    fragment_context: Option<&'context Node>,
 }
 
-impl Parser {
+impl<'context> Parser<'context> {
     // https://html.spec.whatwg.org/multipage/parsing.html#current-template-insertion-mode
     fn current_template_insertion_mode(&self) -> Option<&InsertionMode> {
         self.template_insertion_mode_stack.last()
     }
+
+    /// checks if a node is the first entry in the stack of open elements
+    fn first_in_open_elements(&self, node: &Node) -> bool {
+        todo!()
+    }
+
+    fn get_ancestor_of_node(&self, node: &Node) -> &Node {
+        todo!()
+    }
+
+    // https://html.spec.whatwg.org/multipage/parsing.html#reset-the-insertion-mode-appropriately
+    fn reset_insertion_mode_appropriately(&mut self) {
+        use InsertionMode::*;
+        let mut last = false;
+        let mut node = self.stack_of_open_elements.last().unwrap();
+
+        if self.first_in_open_elements(node) {
+            last = true;
+            if self.fragment_context.is_some() {
+                node = self.fragment_context.unwrap();
+            }
+        }
+        if node.is_element("select") {
+            if !last {
+                let mut ancestor = node;
+
+                while !self.first_in_open_elements(ancestor) {
+                    ancestor = self.get_ancestor_of_node(ancestor);
+                    if ancestor.is_element("template") {
+                        break;
+                    }
+
+                    if ancestor.is_element("table") {
+                        self.insertion_mode = InSelectInTable;
+                        return;
+                    }
+                }
+            }
+            self.insertion_mode = InSelect;
+            return;
+        }
+        if node.is_element("td") || node.is_element("tr") && !last {
+            self.insertion_mode = InCell;
+            return;
+        }
+        if node.is_element("tr") {
+            self.insertion_mode = InRow;
+            return;
+        }
+        if node.is_element("tbody") || node.is_element("thead") || node.is_element("tfoot") {
+            self.insertion_mode = InTableBody;
+            return;
+        }
+        if node.is_element("caption") {
+            self.insertion_mode = InCaption;
+            return;
+        }
+        if node.is_element("colgroup") {
+            self.insertion_mode = InColumnGroup;
+            return;
+        }
+        if node.is_element("table") {
+            self.insertion_mode = InTable;
+            return;
+        }
+        if node.is_element("template") {
+            self.insertion_mode = *self.current_template_insertion_mode().unwrap();
+        }
+        if node.is_element("head") && !last {
+            self.insertion_mode = BeforeHead;
+        }
+    }
+
     // https://html.spec.whatwg.org/multipage/parsing.html#current-node
     fn current_node(&self) -> Option<&Node> {
         self.stack_of_open_elements.last()
     }
     // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
     fn adjusted_current_node(&self) -> Option<&Node> {
-        // TODO: take into account Html fragment parsing algorithm:
-        // https://html.spec.whatwg.org/multipage/parsing.html#parsing-html-fragments
-        self.current_node()
+        if self.fragment_context.is_some() && self.stack_of_open_elements.len() == 1 {
+            self.fragment_context
+        } else {
+            self.current_node()
+        }
     }
 
     // https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
@@ -107,6 +183,7 @@ impl Parser {
     fn process_token(&mut self, next_token: Token) {}
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum InsertionMode {
     Initial,
     BeforeHtml,

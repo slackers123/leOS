@@ -4,9 +4,9 @@ resolver = "2"
 members = [
     "gui_experiments",
     "leo-applications/leo-browser",
-    "leo-libs/corelib",
-    "leo-libs/drawlib", "leo-libs/htmllib",
-    "leo-libs/mathlib", "leo-libs/parserlib", "leo-libs/regexlib",
+    "leo-libs/corelib", "leo-libs/dpilib",
+    "leo-libs/drawlib", "leo-libs/guilib", "leo-libs/htmllib",
+    "leo-libs/mathlib", "leo-libs/parserlib", "leo-libs/regexlib", "leo-libs/renderlib",
     "leo-libs/ttflib",
     "leos-kernel",
     "leos-run",
