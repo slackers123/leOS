@@ -1,5 +1,5 @@
 //! This gui layout system is largely inspired by clay and egui.
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use corelib::types::Float;
 use mathlib::vectors::Vec2F;
@@ -11,23 +11,12 @@ pub struct Node {
     pub size: Vec2F,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct UiColor {
     pub r: Float,
     pub g: Float,
     pub b: Float,
     pub a: Float,
-}
-
-impl Default for UiColor {
-    fn default() -> Self {
-        Self {
-            r: 1.0,
-            g: 1.0,
-            b: 1.0,
-            a: 1.0,
-        }
-    }
 }
 
 impl UiColor {
@@ -60,23 +49,69 @@ impl UiColor {
     };
 }
 
-pub trait Widget {
-    fn ui_box(&self) -> UiBox;
+pub trait Widget: Debug {
+    fn ui_box(&self) -> &UiBox;
+
+    /// Indicates if a Widget can be srhunk i.e. can be wrapped if needed.
+    ///
+    /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
+    fn can_shrink(&self) -> bool {
+        false
+    }
+
+    /// Shrink the widget so that it fits within the new_width and return the new height.
+    ///
+    /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
+    fn shrink(&self, _new_width: Float) -> Float {
+        0.0
+    }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct UiBox {
     pub sizing: Sizing,
     pub background: UiColor,
     pub layout_dir: LayoutDir,
     pub padding: Padding,
     pub child_gap: Float,
+    pub min_width: Float,
+    pub min_height: Float,
+    pub max_width: Float,
+    pub max_height: Float,
+    pub valign: Align,
+    pub halign: Align,
+}
+
+impl Default for UiBox {
+    fn default() -> Self {
+        Self {
+            max_width: Float::INFINITY,
+            max_height: Float::INFINITY,
+            sizing: Sizing::default(),
+            background: UiColor::default(),
+            layout_dir: LayoutDir::default(),
+            padding: Padding::default(),
+            child_gap: f32::default(),
+            min_width: f32::default(),
+            min_height: f32::default(),
+            valign: Align::default(),
+            halign: Align::default(),
+        }
+    }
 }
 
 impl Widget for UiBox {
-    fn ui_box(&self) -> UiBox {
-        *self
+    fn ui_box(&self) -> &UiBox {
+        self
     }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Align {
+    #[default]
+    Start,
+    Center,
+    End,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -85,6 +120,15 @@ pub enum SizeUnit {
     Grow,
     #[default]
     Fit,
+}
+
+impl SizeUnit {
+    fn get_min(&self) -> Float {
+        match self {
+            Self::Fixed(s) => *s,
+            _ => 0.0,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -124,161 +168,463 @@ pub struct Rect {
     pub height: Float,
 }
 
-pub struct LayoutContext {
-    size: Rect,
-    ui_box: UiBox,
-    children: Vec<LayoutContext>,
+#[derive(Debug)]
+pub struct FinalBox {
+    pub pos: Vec2F,
+    pub size: Rect,
+    pub color: UiColor,
 }
 
-impl LayoutContext {
-    /// close the layout context and perform grow and shrink sizing as well as final positioning
-    pub fn grow_shrink_pos(mut self, start: Vec2F) -> Vec<(Vec2F, Rect)> {
-        let mut remaining_width = self.size.width
-            - (self.ui_box.padding.horiz()
-                + (self.ui_box.child_gap * (self.children.len() as Float - 1.0)).max(0.0));
+#[derive(Debug)]
+pub struct FinishedLayoutStage {
+    width: Float,
+    height: Float,
+    widget: Arc<dyn Widget>,
+    children: Vec<FinishedLayoutStage>,
+}
 
-        for child in self.children.iter() {
-            remaining_width -= child.size.width;
-        }
+impl FinishedLayoutStage {
+    fn position(self, start: Vec2F) -> Vec<FinalBox> {
+        let Self {
+            width,
+            height,
+            widget,
+            children,
+        } = self;
+        let ui_box = widget.ui_box();
+        let mut boxes = vec![FinalBox {
+            pos: start,
+            size: Rect { width, height },
+            color: ui_box.background,
+        }];
 
-        let mut growable_children = self
-            .children
-            .iter_mut()
-            .filter(|c| c.ui_box.sizing.width == SizeUnit::Grow)
-            .collect::<Vec<_>>();
+        let total_child_gap = (children.len() as Float - 1.0).max(0.0) * ui_box.child_gap;
 
-        while growable_children.len() > 0 && remaining_width > 0.0 {
-            let mut smallest = growable_children[0].size.width;
-            let mut second_smallest = Float::INFINITY;
-            let mut width_to_add = remaining_width;
+        let avail_width = height
+            - ui_box.padding.horiz()
+            - if ui_box.layout_dir == LayoutDir::LeftToRight {
+                total_child_gap + children.iter().map(|c| c.width).sum::<Float>()
+            } else {
+                0.0
+            };
 
-            for child in growable_children.iter() {
-                if child.size.width < smallest {
-                    second_smallest = smallest;
-                    smallest = child.size.width;
+        let avail_height = height
+            - ui_box.padding.vert()
+            - if ui_box.layout_dir == LayoutDir::TopToBottom {
+                total_child_gap + children.iter().map(|c| c.height).sum::<Float>()
+            } else {
+                0.0
+            };
+
+        let mut stride = start + Vec2F::new(ui_box.padding.left, ui_box.padding.top);
+
+        for child in children {
+            let x_off = match ui_box.halign {
+                Align::Start => 0.0,
+                Align::Center => match ui_box.layout_dir {
+                    LayoutDir::LeftToRight => avail_width / 2.0,
+                    LayoutDir::TopToBottom => (avail_width - child.width) / 2.0,
+                },
+                Align::End => match ui_box.layout_dir {
+                    LayoutDir::LeftToRight => avail_width,
+                    LayoutDir::TopToBottom => avail_width - child.width,
+                },
+            };
+            let y_off = match ui_box.valign {
+                Align::Start => 0.0,
+                Align::Center => match ui_box.layout_dir {
+                    LayoutDir::LeftToRight => avail_height / 2.0,
+                    LayoutDir::TopToBottom => (avail_height - child.height) / 2.0,
+                },
+                Align::End => match ui_box.layout_dir {
+                    LayoutDir::LeftToRight => avail_height,
+                    LayoutDir::TopToBottom => avail_height - child.height,
+                },
+            };
+
+            let off = Vec2F::new(x_off, y_off);
+
+            let add = Vec2F::new(child.width, child.height);
+            boxes.append(&mut child.position(stride + off));
+
+            match ui_box.layout_dir {
+                LayoutDir::LeftToRight => {
+                    stride.x += add.x + ui_box.child_gap;
                 }
-                if child.size.width > smallest {
-                    second_smallest = second_smallest.min(child.size.width);
-                    width_to_add = second_smallest - smallest;
+                LayoutDir::TopToBottom => {
+                    stride.y += add.y + ui_box.child_gap;
                 }
             }
-
-            width_to_add = width_to_add.min(remaining_width / growable_children.len() as Float);
-
-            for child in growable_children.iter_mut() {
-                if child.size.width == smallest {
-                    child.size.width += width_to_add;
-                    remaining_width -= width_to_add;
-                }
-            }
-        }
-
-        let mut boxes = vec![(start, self.size)];
-
-        let mut stride = self.ui_box.padding.left;
-        for child in self.children {
-            let total_add = child.size.width + self.ui_box.child_gap;
-
-            boxes.append(
-                &mut child.grow_shrink_pos(start + Vec2F::new(stride, self.ui_box.padding.top)),
-            );
-
-            stride += total_add;
         }
 
         boxes
     }
 }
 
-impl Debug for LayoutContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "UiContext {{\nsize: {:?}, \nchildren: {:?}\n}}",
-            self.size, self.children
-        )?;
-        Ok(())
+#[derive(Debug)]
+pub struct GrowShrinkHeightStage {
+    width: Float,
+    height: Float,
+    widget: Arc<dyn Widget>,
+    children: Vec<GrowShrinkHeightStage>,
+}
+
+impl GrowShrinkHeightStage {
+    fn grow_shrink_height(self) -> FinishedLayoutStage {
+        let Self {
+            height,
+            width,
+            widget,
+            mut children,
+        } = self;
+
+        let ui_box = widget.ui_box();
+
+        let mut remaining_height = self.height - ui_box.padding.horiz();
+
+        if ui_box.layout_dir == LayoutDir::TopToBottom {
+            remaining_height -= (ui_box.child_gap * (children.len() as Float - 1.0)).max(0.0);
+
+            for child in children.iter() {
+                remaining_height -= child.height;
+            }
+        }
+
+        let shrink = remaining_height.is_sign_negative();
+
+        let mut changable_children = children
+            .iter_mut()
+            .filter(|c| {
+                c.widget.ui_box().sizing.height == SizeUnit::Grow || shrink && c.widget.can_shrink()
+            })
+            .collect::<Vec<_>>();
+
+        while changable_children.len() > 0 && remaining_height.abs() > Float::EPSILON {
+            let mut furthest = changable_children[0].height;
+            let mut second_furthest = if shrink {
+                Float::NEG_INFINITY
+            } else {
+                Float::INFINITY
+            };
+            let mut height_to_add = remaining_height;
+
+            for child in changable_children.iter() {
+                if (shrink && child.height > furthest) || (!shrink && child.height < furthest) {
+                    second_furthest = furthest;
+                    furthest = child.height;
+                }
+                if child.height == furthest {
+                } else {
+                    second_furthest = if shrink {
+                        second_furthest.max(child.height)
+                    } else {
+                        second_furthest.min(child.height)
+                    };
+                    height_to_add = second_furthest - furthest;
+                }
+            }
+
+            let rem_per_child = remaining_height / changable_children.len() as Float;
+            height_to_add = if shrink {
+                height_to_add.max(rem_per_child)
+            } else {
+                height_to_add.min(rem_per_child)
+            };
+
+            dbg!(rem_per_child);
+
+            let mut to_rem = vec![];
+            for (i, child) in changable_children.iter_mut().enumerate() {
+                if (child.height == child.widget.ui_box().max_height && !shrink)
+                    || (child.height == child.widget.ui_box().min_height && shrink)
+                {
+                    to_rem.push(i);
+                    continue;
+                }
+                if child.height == furthest {
+                    child.height += height_to_add;
+                    remaining_height -= height_to_add;
+                }
+            }
+
+            for rem in to_rem {
+                changable_children.swap_remove(rem);
+            }
+        }
+
+        FinishedLayoutStage {
+            width,
+            widget,
+            height,
+            children: children
+                .into_iter()
+                .map(|wf| wf.grow_shrink_height())
+                .collect(),
+        }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
+pub struct FitHeightStage {
+    width: Float,
+    height: Option<Float>,
+    widget: Arc<dyn Widget>,
+    children: Vec<FitHeightStage>,
+}
+
+impl FitHeightStage {
+    fn fit_height(self) -> GrowShrinkHeightStage {
+        let Self {
+            width,
+            height,
+            widget,
+            children,
+        } = self;
+
+        let ui_box = widget.ui_box();
+
+        let children = children
+            .into_iter()
+            .map(|c| c.fit_height())
+            .collect::<Vec<_>>();
+
+        let height = if let Some(height) = height {
+            height
+        } else {
+            match ui_box.sizing.height {
+                SizeUnit::Fit => match ui_box.layout_dir {
+                    LayoutDir::LeftToRight => {
+                        ui_box.padding.vert()
+                            + children
+                                .iter()
+                                .map(|c| c.height)
+                                .max_by(|a, b| a.partial_cmp(b).expect("no NaNs in heights"))
+                                .unwrap_or(0.0)
+                    }
+                    LayoutDir::TopToBottom => {
+                        ui_box.padding.vert()
+                            + children.iter().map(|fitted| fitted.height).sum::<f32>()
+                    }
+                },
+                SizeUnit::Fixed(s) => s,
+                SizeUnit::Grow => 0.0,
+            }
+        }
+        .clamp(ui_box.min_height, ui_box.max_height);
+        GrowShrinkHeightStage {
+            width,
+            height,
+            widget,
+            children,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct WrapStage {
+    width: Float,
+    widget: Arc<dyn Widget>,
+    children: Vec<WrapStage>,
+}
+
+impl WrapStage {
+    pub fn wrap(self) -> FitHeightStage {
+        let Self {
+            width,
+            widget,
+            children,
+        } = self;
+        let children = children.into_iter().map(|c| c.wrap()).collect();
+
+        FitHeightStage {
+            children,
+            height: (widget.can_shrink() && width < widget.ui_box().sizing.width.get_min())
+                .then(|| widget.shrink(width)),
+            width,
+            widget,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct GrowShrinkWidthStage {
+    width: Float,
+    widget: Arc<dyn Widget>,
+    children: Vec<GrowShrinkWidthStage>,
+}
+
+impl GrowShrinkWidthStage {
+    pub fn grow_shrink_width(self) -> WrapStage {
+        let Self {
+            width,
+            widget,
+            mut children,
+        } = self;
+
+        let ui_box = widget.ui_box();
+
+        let mut remaining_width = self.width - ui_box.padding.horiz();
+
+        if ui_box.layout_dir == LayoutDir::LeftToRight {
+            remaining_width -= (ui_box.child_gap * (children.len() as Float - 1.0)).max(0.0);
+
+            for child in children.iter() {
+                remaining_width -= child.width;
+            }
+        }
+
+        let shrink = remaining_width.is_sign_negative();
+
+        let mut changable_children = children
+            .iter_mut()
+            .filter(|c| {
+                c.widget.ui_box().sizing.width == SizeUnit::Grow || shrink && c.widget.can_shrink()
+            })
+            .collect::<Vec<_>>();
+
+        while changable_children.len() > 0 && remaining_width.abs() > Float::EPSILON {
+            let mut furthest = changable_children[0].width;
+            let mut second_furthest = if shrink {
+                Float::NEG_INFINITY
+            } else {
+                Float::INFINITY
+            };
+            let mut width_to_add = remaining_width;
+
+            for child in changable_children.iter() {
+                if (shrink && child.width > furthest) || (!shrink && child.width < furthest) {
+                    second_furthest = furthest;
+                    furthest = child.width;
+                }
+                if child.width == furthest {
+                } else {
+                    second_furthest = if shrink {
+                        second_furthest.max(child.width)
+                    } else {
+                        second_furthest.min(child.width)
+                    };
+                    width_to_add = second_furthest - furthest;
+                }
+            }
+
+            let rem_per_child = remaining_width / changable_children.len() as Float;
+            width_to_add = if shrink {
+                width_to_add.max(rem_per_child)
+            } else {
+                width_to_add.min(rem_per_child)
+            };
+
+            let mut to_rem = vec![];
+            for (i, child) in changable_children.iter_mut().enumerate() {
+                if (child.width == child.widget.ui_box().max_width && !shrink)
+                    || (child.width == child.widget.ui_box().min_width && shrink)
+                {
+                    to_rem.push(i);
+                    continue;
+                }
+                if child.width == furthest {
+                    child.width += width_to_add;
+                    remaining_width -= width_to_add;
+                }
+            }
+
+            for rem in to_rem {
+                changable_children.swap_remove(rem);
+            }
+        }
+
+        WrapStage {
+            width,
+            widget,
+            children: children
+                .into_iter()
+                .map(|wf| wf.grow_shrink_width())
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct UiContext {
-    ui_box: UiBox,
-    children: Vec<LayoutContext>,
+    widget: Arc<dyn Widget>,
+    children: Vec<GrowShrinkWidthStage>,
+}
+
+impl Default for UiContext {
+    fn default() -> Self {
+        Self {
+            widget: Arc::new(UiBox::default()),
+            children: vec![],
+        }
+    }
 }
 
 impl UiContext {
-    pub fn new(ui_box: UiBox) -> Self {
+    fn new(widget: Arc<dyn Widget>) -> Self {
         Self {
-            ui_box,
+            widget,
             children: vec![],
         }
     }
 
     /// close the UiContext and perform Fit sizing
-    fn close_ctx(self) -> LayoutContext {
-        let mut size = Rect::default();
-        match self.ui_box.layout_dir {
-            LayoutDir::LeftToRight => {
-                size.width = match self.ui_box.sizing.width {
-                    SizeUnit::Fit => {
-                        // add padding and child gap
-                        self.ui_box.padding.horiz()
-                            + (self.children.len() as Float - 1.0).max(0.0) * self.ui_box.child_gap
+    fn fit_width(self) -> GrowShrinkWidthStage {
+        let Self { widget, children } = self;
 
-                        // add child sizes
-                        + self.children.iter().map(|ctx| ctx.size.width).sum::<f32>()
-                    }
-                    SizeUnit::Fixed(s) => s,
-                    SizeUnit::Grow => 0.0,
-                };
-
-                size.height = match self.ui_box.sizing.height {
-                    SizeUnit::Fit => {
-                        // add padding
-                        self.ui_box.padding.vert()
-
-                        // add largest child size
-                        + self.children.iter().map(|ctx| ctx.size.height)
-                            .max_by(|a, b| a.partial_cmp(b).expect("no NaNs in heights")).unwrap_or(0.0)
-                    }
-                    SizeUnit::Fixed(s) => s,
-                    SizeUnit::Grow => 0.0,
-                };
-            }
-            _ => todo!("top-to-bottom sizing"),
+        let ui_box = widget.ui_box();
+        let width = match ui_box.sizing.width {
+            SizeUnit::Fit => match ui_box.layout_dir {
+                LayoutDir::LeftToRight => {
+                    ui_box.padding.horiz()
+                        + (children.len() as Float - 1.0).max(0.0) * ui_box.child_gap
+                        + children.iter().map(|fitted| fitted.width).sum::<f32>()
+                }
+                LayoutDir::TopToBottom => {
+                    ui_box.padding.horiz()
+                        + children
+                            .iter()
+                            .map(|c| c.width)
+                            .max_by(|a, b| a.partial_cmp(b).expect("no NaNs in widths"))
+                            .unwrap_or(0.0)
+                }
+            },
+            SizeUnit::Fixed(s) => s,
+            SizeUnit::Grow => 0.0,
         }
+        .clamp(ui_box.min_width, ui_box.max_width);
 
-        LayoutContext {
-            size,
-            ui_box: self.ui_box,
-            children: self.children,
+        GrowShrinkWidthStage {
+            width,
+            widget,
+            children,
         }
     }
 
-    pub fn add<F>(&mut self, widget: impl Widget, inner: F)
+    pub fn add<F>(&mut self, widget: impl Widget + 'static, inner: F)
     where
         F: FnOnce(&mut UiContext),
     {
-        let mut sub_ctx = UiContext::new(widget.ui_box());
+        let widget = Arc::new(widget);
+        let mut sub_ctx = UiContext::new(widget.clone());
 
         inner(&mut sub_ctx);
 
-        self.children.push(sub_ctx.close_ctx());
+        self.children.push(sub_ctx.fit_width());
     }
 }
 
 pub fn gui_test() {
     use SizeUnit::*;
-    let mut ui = UiContext::new(UiBox::default());
+    let mut ui = UiContext::default();
 
     ui.add(
         UiBox {
             sizing: Sizing {
                 width: Fixed(1600.0),
-                height: Fit,
+                height: Fit {},
             },
             background: UiColor::BLUE,
+            layout_dir: LayoutDir::TopToBottom,
             ..Default::default()
         },
         |ui| {
@@ -298,7 +644,7 @@ pub fn gui_test() {
                 UiBox {
                     sizing: Sizing {
                         width: Grow,
-                        height: Fixed(200.0),
+                        height: Grow,
                     },
                     background: UiColor::YELLOW,
                     ..Default::default()
@@ -320,11 +666,17 @@ pub fn gui_test() {
         },
     );
 
-    let layout = ui.close_ctx();
+    let fw = ui.fit_width();
 
-    println!("{layout:?}");
+    let gsw = fw.grow_shrink_width();
 
-    let boxes = layout.grow_shrink_pos(Vec2F::ZERO);
+    let wrapped = gsw.wrap();
 
-    println!("{boxes:?}");
+    let fh = wrapped.fit_height();
+
+    let gsh = fh.grow_shrink_height();
+
+    let pos = gsh.position(Vec2F::ZERO);
+
+    dbg!(pos);
 }
