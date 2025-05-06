@@ -3,6 +3,10 @@ use std::{fmt::Debug, sync::Arc};
 
 use corelib::types::Float;
 use mathlib::vectors::Vec2F;
+use widgets::button::Button;
+
+pub mod base;
+pub mod widgets;
 
 #[derive(Debug)]
 pub struct Node {
@@ -49,23 +53,73 @@ impl UiColor {
     };
 }
 
-pub trait Widget: Debug {
-    fn ui_box(&self) -> &UiBox;
+pub trait Widget<I>: Debug + Sized + Clone {
+    const CAN_SHRINK: bool = false;
 
-    /// Indicates if a Widget can be srhunk i.e. can be wrapped if needed.
-    ///
-    /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
-    fn can_shrink(&self) -> bool {
-        false
-    }
+    fn container(&self) -> UiBox;
+    fn produce(self, ctx: &mut UiContext, inner: I);
 
-    /// Shrink the widget so that it fits within the new_width and return the new height.
-    ///
-    /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
-    fn shrink(&self, _new_width: Float) -> Float {
+    fn shrink(&self, _new_size: Float) -> Float {
         0.0
     }
 }
+
+struct WidgetInt<'ctx> {
+    ui_box: Arc<UiBox>, // made this an arc so maybe in the future we can only store unique UIBoxes
+    shrink_cb: Option<Box<dyn FnMut(Float) -> Float + 'ctx>>,
+}
+
+impl<'ctx> WidgetInt<'ctx> {
+    fn from_widget<W, I>(widget: W) -> Self
+    where
+        W: Widget<I> + 'ctx,
+    {
+        Self {
+            ui_box: Arc::new(widget.container()),
+            shrink_cb: W::CAN_SHRINK.then_some(Box::new(move |f| widget.shrink(f))),
+        }
+    }
+}
+
+impl<'ctx> Debug for WidgetInt<'ctx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "WidgetInt {{ ui_box: {:?}, shrinkable: {}}}",
+            self.ui_box,
+            self.shrink_cb.is_some()
+        )
+    }
+}
+
+// pub(crate) trait WidgetIntImpl<'ctx, I>: Debug + 'ctx {
+//     fn to_widget_int(self) -> WidgetInt<'ctx>;
+
+//     /// Indicates if a Widget can be srhunk i.e. can be wrapped if needed.
+//     ///
+//     /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
+//     fn can_shrink(&self) -> bool {
+//         false
+//     }
+
+//     /// Shrink the widget so that it fits within the new_width and return the new height.
+//     ///
+//     /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
+//     fn shrink(&self, _new_width: Float) -> Float {
+//         0.0
+//     }
+// }
+
+// impl<'ctx, I, T: Widget<I> + 'ctx> WidgetIntImpl<'ctx, I> for T {
+//     fn to_widget_int(self) -> WidgetInt<'ctx> {
+//         WidgetInt {
+//             ui_box: Arc::new(self.container()),
+//             shrink_cb: self
+//                 .can_shrink()
+//                 .then_some(Box::new(move |f| self.shrink(f))),
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct UiBox {
@@ -100,9 +154,18 @@ impl Default for UiBox {
     }
 }
 
-impl Widget for UiBox {
-    fn ui_box(&self) -> &UiBox {
-        self
+pub type ChildContent = dyn Fn(&mut UiContext);
+
+impl<F> Widget<F> for UiBox
+where
+    F: FnOnce(&mut UiContext),
+{
+    fn container(&self) -> UiBox {
+        *self
+    }
+
+    fn produce(self, ctx: &mut UiContext, inner: F) {
+        inner(ctx)
     }
 }
 
@@ -176,14 +239,14 @@ pub struct FinalBox {
 }
 
 #[derive(Debug)]
-pub struct FinishedLayoutStage {
+pub struct FinishedLayoutStage<'ctx> {
     width: Float,
     height: Float,
-    widget: Arc<dyn Widget>,
-    children: Vec<FinishedLayoutStage>,
+    widget: WidgetInt<'ctx>,
+    children: Vec<FinishedLayoutStage<'ctx>>,
 }
 
-impl FinishedLayoutStage {
+impl<'ctx> FinishedLayoutStage<'ctx> {
     fn position(self, start: Vec2F) -> Vec<FinalBox> {
         let Self {
             width,
@@ -191,7 +254,7 @@ impl FinishedLayoutStage {
             widget,
             children,
         } = self;
-        let ui_box = widget.ui_box();
+        let ui_box = widget.ui_box;
         let mut boxes = vec![FinalBox {
             pos: start,
             size: Rect { width, height },
@@ -262,15 +325,15 @@ impl FinishedLayoutStage {
 }
 
 #[derive(Debug)]
-pub struct GrowShrinkHeightStage {
+pub struct GrowShrinkHeightStage<'ctx> {
     width: Float,
     height: Float,
-    widget: Arc<dyn Widget>,
-    children: Vec<GrowShrinkHeightStage>,
+    widget: WidgetInt<'ctx>,
+    children: Vec<GrowShrinkHeightStage<'ctx>>,
 }
 
-impl GrowShrinkHeightStage {
-    fn grow_shrink_height(self) -> FinishedLayoutStage {
+impl<'ctx> GrowShrinkHeightStage<'ctx> {
+    fn grow_shrink_height(self) -> FinishedLayoutStage<'ctx> {
         let Self {
             height,
             width,
@@ -278,7 +341,7 @@ impl GrowShrinkHeightStage {
             mut children,
         } = self;
 
-        let ui_box = widget.ui_box();
+        let ui_box = widget.ui_box.clone();
 
         let mut remaining_height = self.height - ui_box.padding.horiz();
 
@@ -295,7 +358,8 @@ impl GrowShrinkHeightStage {
         let mut changable_children = children
             .iter_mut()
             .filter(|c| {
-                c.widget.ui_box().sizing.height == SizeUnit::Grow || shrink && c.widget.can_shrink()
+                c.widget.ui_box.sizing.height == SizeUnit::Grow
+                    || shrink && c.widget.shrink_cb.is_some()
             })
             .collect::<Vec<_>>();
 
@@ -335,8 +399,8 @@ impl GrowShrinkHeightStage {
 
             let mut to_rem = vec![];
             for (i, child) in changable_children.iter_mut().enumerate() {
-                if (child.height == child.widget.ui_box().max_height && !shrink)
-                    || (child.height == child.widget.ui_box().min_height && shrink)
+                if (child.height == child.widget.ui_box.max_height && !shrink)
+                    || (child.height == child.widget.ui_box.min_height && shrink)
                 {
                     to_rem.push(i);
                     continue;
@@ -365,15 +429,15 @@ impl GrowShrinkHeightStage {
 }
 
 #[derive(Debug)]
-pub struct FitHeightStage {
+pub struct FitHeightStage<'ctx> {
     width: Float,
     height: Option<Float>,
-    widget: Arc<dyn Widget>,
-    children: Vec<FitHeightStage>,
+    widget: WidgetInt<'ctx>,
+    children: Vec<FitHeightStage<'ctx>>,
 }
 
-impl FitHeightStage {
-    fn fit_height(self) -> GrowShrinkHeightStage {
+impl<'ctx> FitHeightStage<'ctx> {
+    fn fit_height(self) -> GrowShrinkHeightStage<'ctx> {
         let Self {
             width,
             height,
@@ -381,7 +445,7 @@ impl FitHeightStage {
             children,
         } = self;
 
-        let ui_box = widget.ui_box();
+        let ui_box = widget.ui_box.clone();
 
         let children = children
             .into_iter()
@@ -421,25 +485,25 @@ impl FitHeightStage {
 }
 
 #[derive(Debug)]
-pub struct WrapStage {
+pub struct WrapStage<'ctx> {
     width: Float,
-    widget: Arc<dyn Widget>,
-    children: Vec<WrapStage>,
+    widget: WidgetInt<'ctx>,
+    children: Vec<WrapStage<'ctx>>,
 }
 
-impl WrapStage {
-    pub fn wrap(self) -> FitHeightStage {
+impl<'ctx> WrapStage<'ctx> {
+    pub fn wrap(self) -> FitHeightStage<'ctx> {
         let Self {
             width,
-            widget,
+            mut widget,
             children,
         } = self;
         let children = children.into_iter().map(|c| c.wrap()).collect();
 
         FitHeightStage {
             children,
-            height: (widget.can_shrink() && width < widget.ui_box().sizing.width.get_min())
-                .then(|| widget.shrink(width)),
+            height: (widget.shrink_cb.is_some() && width < widget.ui_box.sizing.width.get_min())
+                .then(|| widget.shrink_cb.take().unwrap()(width)),
             width,
             widget,
         }
@@ -447,21 +511,21 @@ impl WrapStage {
 }
 
 #[derive(Debug)]
-pub struct GrowShrinkWidthStage {
+pub struct GrowShrinkWidthStage<'ctx> {
     width: Float,
-    widget: Arc<dyn Widget>,
-    children: Vec<GrowShrinkWidthStage>,
+    widget: WidgetInt<'ctx>,
+    children: Vec<GrowShrinkWidthStage<'ctx>>,
 }
 
-impl GrowShrinkWidthStage {
-    pub fn grow_shrink_width(self) -> WrapStage {
+impl<'ctx> GrowShrinkWidthStage<'ctx> {
+    pub fn grow_shrink_width(self) -> WrapStage<'ctx> {
         let Self {
             width,
             widget,
             mut children,
         } = self;
 
-        let ui_box = widget.ui_box();
+        let ui_box = widget.ui_box.clone();
 
         let mut remaining_width = self.width - ui_box.padding.horiz();
 
@@ -478,7 +542,8 @@ impl GrowShrinkWidthStage {
         let mut changable_children = children
             .iter_mut()
             .filter(|c| {
-                c.widget.ui_box().sizing.width == SizeUnit::Grow || shrink && c.widget.can_shrink()
+                c.widget.ui_box.sizing.width == SizeUnit::Grow
+                    || shrink && c.widget.shrink_cb.is_some()
             })
             .collect::<Vec<_>>();
 
@@ -516,8 +581,8 @@ impl GrowShrinkWidthStage {
 
             let mut to_rem = vec![];
             for (i, child) in changable_children.iter_mut().enumerate() {
-                if (child.width == child.widget.ui_box().max_width && !shrink)
-                    || (child.width == child.widget.ui_box().min_width && shrink)
+                if (child.width == child.widget.ui_box.max_width && !shrink)
+                    || (child.width == child.widget.ui_box.min_width && shrink)
                 {
                     to_rem.push(i);
                     continue;
@@ -544,34 +609,34 @@ impl GrowShrinkWidthStage {
     }
 }
 
-#[derive(Debug)]
-pub struct UiContext {
-    widget: Arc<dyn Widget>,
-    children: Vec<GrowShrinkWidthStage>,
+pub struct UiContext<'ctx> {
+    widget: WidgetInt<'ctx>,
+    children: Vec<GrowShrinkWidthStage<'ctx>>,
 }
 
-impl Default for UiContext {
-    fn default() -> Self {
+impl<'ctx> UiContext<'ctx> {
+    fn new<I>(widget: impl Widget<I> + 'ctx) -> Self {
         Self {
-            widget: Arc::new(UiBox::default()),
             children: vec![],
+            widget: WidgetInt::from_widget(widget),
         }
     }
-}
 
-impl UiContext {
-    fn new(widget: Arc<dyn Widget>) -> Self {
+    fn root_container() -> Self {
         Self {
-            widget,
             children: vec![],
+            widget: WidgetInt {
+                ui_box: Arc::new(UiBox::default()),
+                shrink_cb: None,
+            },
         }
     }
 
     /// close the UiContext and perform Fit sizing
-    fn fit_width(self) -> GrowShrinkWidthStage {
-        let Self { widget, children } = self;
+    fn fit_width(self) -> GrowShrinkWidthStage<'ctx> {
+        let Self { children, widget } = self;
 
-        let ui_box = widget.ui_box();
+        let ui_box = widget.ui_box.clone();
         let width = match ui_box.sizing.width {
             SizeUnit::Fit => match ui_box.layout_dir {
                 LayoutDir::LeftToRight => {
@@ -594,20 +659,19 @@ impl UiContext {
         .clamp(ui_box.min_width, ui_box.max_width);
 
         GrowShrinkWidthStage {
-            width,
             widget,
+            width,
             children,
         }
     }
 
-    pub fn add<F>(&mut self, widget: impl Widget + 'static, inner: F)
+    pub fn add<W, I>(&mut self, widget: W, inner: I)
     where
-        F: FnOnce(&mut UiContext),
+        W: Widget<I> + 'ctx,
     {
-        let widget = Arc::new(widget);
         let mut sub_ctx = UiContext::new(widget.clone());
 
-        inner(&mut sub_ctx);
+        widget.produce(&mut sub_ctx, inner);
 
         self.children.push(sub_ctx.fit_width());
     }
@@ -615,7 +679,7 @@ impl UiContext {
 
 pub fn gui_test() {
     use SizeUnit::*;
-    let mut ui = UiContext::default();
+    let mut ui = UiContext::root_container();
 
     ui.add(
         UiBox {
@@ -663,6 +727,13 @@ pub fn gui_test() {
                 },
                 |_| {},
             );
+
+            ui.add(
+                Button {
+                    ..Default::default()
+                },
+                (),
+            );
         },
     );
 
@@ -679,4 +750,6 @@ pub fn gui_test() {
     let pos = gsh.position(Vec2F::ZERO);
 
     dbg!(pos);
+
+    todo!("better widget api")
 }

@@ -1,0 +1,42 @@
+use corelib::types::Float;
+
+use crate::{SizeUnit, UiBox, Widget};
+
+#[derive(Debug, Default, Clone)]
+pub struct Text {
+    pub content: String,
+    pub font_size: Float,
+}
+
+impl Widget<()> for Text {
+    const CAN_SHRINK: bool = true;
+
+    fn container(&self) -> crate::UiBox {
+        let mut ui_box = UiBox::default();
+
+        // FIXME: this is obviously not correct and just a dummy implementation
+
+        ui_box.sizing.width = SizeUnit::Fixed(self.content.len() as Float * self.font_size);
+
+        ui_box.sizing.height = SizeUnit::Fixed(self.font_size);
+
+        ui_box
+    }
+
+    fn produce(self, _ctx: &mut crate::UiContext, _: ()) {}
+
+    fn shrink(&self, new_width: Float) -> Float {
+        let mut stride = 0.0;
+        let mut line_cnt = 0;
+        for word in self.content.split_whitespace() {
+            let word_len = word.len() as Float * self.font_size;
+            stride += word_len;
+            if stride >= new_width {
+                line_cnt += 1;
+                stride = word_len;
+            }
+        }
+
+        line_cnt as Float * self.font_size
+    }
+}
