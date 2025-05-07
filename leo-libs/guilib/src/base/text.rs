@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use corelib::types::Float;
 
-use crate::{SizeUnit, UiBox, Widget};
+use crate::{IntoWidgetInt, SizeUnit, UiBox, WidgetInt};
 
 #[derive(Debug, Default, Clone)]
 pub struct Text {
@@ -8,10 +10,22 @@ pub struct Text {
     pub font_size: Float,
 }
 
-impl Widget<()> for Text {
+impl IntoWidgetInt<()> for Text {
     const CAN_SHRINK: bool = true;
 
-    fn container(&self) -> crate::UiBox {
+    #[allow(private_interfaces)]
+    fn into_widget_int(self) -> WidgetInt {
+        let ui_box = self.ui_box();
+        WidgetInt {
+            ui_box: Arc::new(ui_box),
+            shrink_cb: Some(Box::new(move |f| {
+                let widget = self.clone();
+                widget.shrink(f)
+            })),
+        }
+    }
+
+    fn ui_box(&self) -> crate::UiBox {
         let mut ui_box = UiBox::default();
 
         // FIXME: this is obviously not correct and just a dummy implementation

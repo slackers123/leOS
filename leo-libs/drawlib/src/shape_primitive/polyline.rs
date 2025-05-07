@@ -26,7 +26,7 @@ impl PolyLine {
 }
 
 impl Drawable for PolyLine {
-    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
-        self.0.draw(target);
+    fn to_primitives(self) -> Vec<crate::primitive::Primitve> {
+        self.0.to_primitives()
     }
 }

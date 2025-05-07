@@ -54,34 +54,52 @@ impl UiColor {
 }
 
 pub trait Widget<I>: Debug + Sized + Clone {
-    const CAN_SHRINK: bool = false;
-
     fn container(&self) -> UiBox;
     fn produce(self, ctx: &mut UiContext, inner: I);
+}
 
+struct WidgetInt {
+    ui_box: Arc<UiBox>, // made this an arc so maybe in the future we can only store unique UIBoxes
+    shrink_cb: Option<Box<dyn FnMut(Float) -> Float + 'static>>,
+}
+
+/// This trait functions to convert Widgets into their internal representation.
+/// It should usually not be implemented by library users. Instead implement the
+/// [`Widget`] trait.
+pub trait IntoWidgetInt<I>: Clone {
+    const CAN_SHRINK: bool = false;
+    #[allow(private_interfaces)]
+    fn into_widget_int(self) -> WidgetInt;
+    fn ui_box(&self) -> UiBox;
+    fn produce(self, ctx: &mut UiContext, inner: I);
+    fn shrink(&self, new_size: Float) -> Float;
+}
+
+impl<I, T: Widget<I> + 'static> IntoWidgetInt<I> for T {
+    #[allow(private_interfaces)]
+    fn into_widget_int(self) -> WidgetInt {
+        let ui_box = self.container();
+        WidgetInt {
+            ui_box: Arc::new(ui_box),
+            shrink_cb: T::CAN_SHRINK.then_some(Box::new(move |f| {
+                let widget = self.clone();
+                widget.shrink(f)
+            })),
+        }
+    }
+
+    fn ui_box(&self) -> UiBox {
+        self.container()
+    }
+    fn produce(self, ctx: &mut UiContext, inner: I) {
+        self.produce(ctx, inner);
+    }
     fn shrink(&self, _new_size: Float) -> Float {
         0.0
     }
 }
 
-struct WidgetInt<'ctx> {
-    ui_box: Arc<UiBox>, // made this an arc so maybe in the future we can only store unique UIBoxes
-    shrink_cb: Option<Box<dyn FnMut(Float) -> Float + 'ctx>>,
-}
-
-impl<'ctx> WidgetInt<'ctx> {
-    fn from_widget<W, I>(widget: W) -> Self
-    where
-        W: Widget<I> + 'ctx,
-    {
-        Self {
-            ui_box: Arc::new(widget.container()),
-            shrink_cb: W::CAN_SHRINK.then_some(Box::new(move |f| widget.shrink(f))),
-        }
-    }
-}
-
-impl<'ctx> Debug for WidgetInt<'ctx> {
+impl Debug for WidgetInt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -92,36 +110,7 @@ impl<'ctx> Debug for WidgetInt<'ctx> {
     }
 }
 
-// pub(crate) trait WidgetIntImpl<'ctx, I>: Debug + 'ctx {
-//     fn to_widget_int(self) -> WidgetInt<'ctx>;
-
-//     /// Indicates if a Widget can be srhunk i.e. can be wrapped if needed.
-//     ///
-//     /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
-//     fn can_shrink(&self) -> bool {
-//         false
-//     }
-
-//     /// Shrink the widget so that it fits within the new_width and return the new height.
-//     ///
-//     /// Users should rarely if ever implement this function as for now only Text elements should be wrapped.
-//     fn shrink(&self, _new_width: Float) -> Float {
-//         0.0
-//     }
-// }
-
-// impl<'ctx, I, T: Widget<I> + 'ctx> WidgetIntImpl<'ctx, I> for T {
-//     fn to_widget_int(self) -> WidgetInt<'ctx> {
-//         WidgetInt {
-//             ui_box: Arc::new(self.container()),
-//             shrink_cb: self
-//                 .can_shrink()
-//                 .then_some(Box::new(move |f| self.shrink(f))),
-//         }
-//     }
-// }
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct UiBox {
     pub sizing: Sizing,
     pub background: UiColor,
@@ -154,17 +143,15 @@ impl Default for UiBox {
     }
 }
 
-pub type ChildContent = dyn Fn(&mut UiContext);
-
-impl<F> Widget<F> for UiBox
+impl<I> Widget<I> for UiBox
 where
-    F: FnOnce(&mut UiContext),
+    I: FnMut(&mut UiContext),
 {
     fn container(&self) -> UiBox {
-        *self
+        self.clone()
     }
 
-    fn produce(self, ctx: &mut UiContext, inner: F) {
+    fn produce(self, ctx: &mut UiContext, mut inner: I) {
         inner(ctx)
     }
 }
@@ -239,14 +226,14 @@ pub struct FinalBox {
 }
 
 #[derive(Debug)]
-pub struct FinishedLayoutStage<'ctx> {
+pub struct FinishedLayoutStage {
     width: Float,
     height: Float,
-    widget: WidgetInt<'ctx>,
-    children: Vec<FinishedLayoutStage<'ctx>>,
+    widget: WidgetInt,
+    children: Vec<FinishedLayoutStage>,
 }
 
-impl<'ctx> FinishedLayoutStage<'ctx> {
+impl FinishedLayoutStage {
     fn position(self, start: Vec2F) -> Vec<FinalBox> {
         let Self {
             width,
@@ -325,15 +312,15 @@ impl<'ctx> FinishedLayoutStage<'ctx> {
 }
 
 #[derive(Debug)]
-pub struct GrowShrinkHeightStage<'ctx> {
+pub struct GrowShrinkHeightStage {
     width: Float,
     height: Float,
-    widget: WidgetInt<'ctx>,
-    children: Vec<GrowShrinkHeightStage<'ctx>>,
+    widget: WidgetInt,
+    children: Vec<GrowShrinkHeightStage>,
 }
 
-impl<'ctx> GrowShrinkHeightStage<'ctx> {
-    fn grow_shrink_height(self) -> FinishedLayoutStage<'ctx> {
+impl GrowShrinkHeightStage {
+    fn grow_shrink_height(self) -> FinishedLayoutStage {
         let Self {
             height,
             width,
@@ -429,15 +416,15 @@ impl<'ctx> GrowShrinkHeightStage<'ctx> {
 }
 
 #[derive(Debug)]
-pub struct FitHeightStage<'ctx> {
+pub struct FitHeightStage {
     width: Float,
     height: Option<Float>,
-    widget: WidgetInt<'ctx>,
-    children: Vec<FitHeightStage<'ctx>>,
+    widget: WidgetInt,
+    children: Vec<FitHeightStage>,
 }
 
-impl<'ctx> FitHeightStage<'ctx> {
-    fn fit_height(self) -> GrowShrinkHeightStage<'ctx> {
+impl FitHeightStage {
+    fn fit_height(self) -> GrowShrinkHeightStage {
         let Self {
             width,
             height,
@@ -485,14 +472,14 @@ impl<'ctx> FitHeightStage<'ctx> {
 }
 
 #[derive(Debug)]
-pub struct WrapStage<'ctx> {
+pub struct WrapStage {
     width: Float,
-    widget: WidgetInt<'ctx>,
-    children: Vec<WrapStage<'ctx>>,
+    widget: WidgetInt,
+    children: Vec<WrapStage>,
 }
 
-impl<'ctx> WrapStage<'ctx> {
-    pub fn wrap(self) -> FitHeightStage<'ctx> {
+impl WrapStage {
+    pub fn wrap(self) -> FitHeightStage {
         let Self {
             width,
             mut widget,
@@ -511,14 +498,14 @@ impl<'ctx> WrapStage<'ctx> {
 }
 
 #[derive(Debug)]
-pub struct GrowShrinkWidthStage<'ctx> {
+pub struct GrowShrinkWidthStage {
     width: Float,
-    widget: WidgetInt<'ctx>,
-    children: Vec<GrowShrinkWidthStage<'ctx>>,
+    widget: WidgetInt,
+    children: Vec<GrowShrinkWidthStage>,
 }
 
-impl<'ctx> GrowShrinkWidthStage<'ctx> {
-    pub fn grow_shrink_width(self) -> WrapStage<'ctx> {
+impl GrowShrinkWidthStage {
+    pub fn grow_shrink_width(self) -> WrapStage {
         let Self {
             width,
             widget,
@@ -609,16 +596,16 @@ impl<'ctx> GrowShrinkWidthStage<'ctx> {
     }
 }
 
-pub struct UiContext<'ctx> {
-    widget: WidgetInt<'ctx>,
-    children: Vec<GrowShrinkWidthStage<'ctx>>,
+pub struct UiContext {
+    widget: WidgetInt,
+    children: Vec<GrowShrinkWidthStage>,
 }
 
-impl<'ctx> UiContext<'ctx> {
-    fn new<I>(widget: impl Widget<I> + 'ctx) -> Self {
+impl UiContext {
+    fn new<I>(widget: impl IntoWidgetInt<I>) -> Self {
         Self {
             children: vec![],
-            widget: WidgetInt::from_widget(widget),
+            widget: widget.into_widget_int(),
         }
     }
 
@@ -633,7 +620,7 @@ impl<'ctx> UiContext<'ctx> {
     }
 
     /// close the UiContext and perform Fit sizing
-    fn fit_width(self) -> GrowShrinkWidthStage<'ctx> {
+    fn fit_width(self) -> GrowShrinkWidthStage {
         let Self { children, widget } = self;
 
         let ui_box = widget.ui_box.clone();
@@ -665,9 +652,10 @@ impl<'ctx> UiContext<'ctx> {
         }
     }
 
+    /// Add a widget to the current UiContext.
     pub fn add<W, I>(&mut self, widget: W, inner: I)
     where
-        W: Widget<I> + 'ctx,
+        W: IntoWidgetInt<I>,
     {
         let mut sub_ctx = UiContext::new(widget.clone());
 
@@ -701,7 +689,17 @@ pub fn gui_test() {
                     background: UiColor::PINK,
                     ..Default::default()
                 },
-                |_| {},
+                |ui| {
+                    for i in 0..10 {
+                        ui.add(
+                            UiBox {
+                                child_gap: i as Float,
+                                ..Default::default()
+                            },
+                            |_| {},
+                        );
+                    }
+                },
             );
 
             ui.add(

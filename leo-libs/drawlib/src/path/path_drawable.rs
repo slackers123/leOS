@@ -3,9 +3,9 @@ use crate::drawable::Drawable;
 use super::Path;
 
 impl Drawable for Path {
-    fn draw(&self, target: &mut impl crate::draw_target::DrawTarget) {
+    fn to_primitives(self) -> Vec<crate::primitive::Primitve> {
         // TODO: path filling here
-        self.to_stroke_path().draw(target)
+        self.to_stroke_path().to_primitives()
     }
 }
 
