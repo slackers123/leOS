@@ -8,3 +8,4 @@ mathlib = { path = "../mathlib" }
 corelib = { path = "../corelib" }
 ttflib = { path = "../ttflib" }
 dpilib = { path = "../dpilib" }
+renderlib = { path = "../renderlib" }

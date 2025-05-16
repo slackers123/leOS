@@ -1,5 +1,6 @@
 use corelib::types::Float;
 use mathlib::vectors::Vec2;
+use renderlib::primitive::Primitive;
 
 use crate::{drawable::Drawable, path::Path};
 
@@ -21,7 +22,7 @@ impl Line {
 }
 
 impl Drawable for Line {
-    fn to_primitives(self) -> Vec<crate::primitive::Primitve> {
+    fn to_primitives(self) -> Vec<Primitive> {
         self.0.to_primitives()
     }
 }

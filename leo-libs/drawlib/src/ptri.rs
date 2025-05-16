@@ -1,10 +1,11 @@
 use corelib::types::{Float, Uint};
 use mathlib::{color::ColA, vectors::Vec2};
-
-use crate::{
-    drawable::Drawable,
-    primitive::{Material, Mesh, Primitve},
+use renderlib::{
+    material::Material,
+    primitive::{Mesh, Primitive},
 };
+
+use crate::drawable::Drawable;
 
 /// A pixel triangle in screen space.
 ///
@@ -22,9 +23,10 @@ impl PTri {
 }
 
 impl Drawable for PTri {
-    fn to_primitives(self) -> Vec<crate::primitive::Primitve> {
-        vec![Primitve {
+    fn to_primitives(self) -> Vec<Primitive> {
+        vec![Primitive {
             mesh: Mesh {
+                ty: renderlib::primitive::MeshType::Triangle,
                 vertices: vec![self.a, self.b, self.c],
                 indices: vec![0, 1, 2],
             },

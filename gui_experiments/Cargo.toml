@@ -17,3 +17,4 @@ corelib = { path = "../leo-libs/corelib" }
 # htmllib = { path = "../leo-libs/htmllib" }
 regexlib = { path = "../leo-libs/regexlib" }
 guilib = { path = "../leo-libs/guilib" }
+renderlib = { path = "../leo-libs/renderlib" }

@@ -1,9 +1,11 @@
+use renderlib::primitive::Primitive;
+
 use crate::drawable::Drawable;
 
 use super::Path;
 
 impl Drawable for Path {
-    fn to_primitives(self) -> Vec<crate::primitive::Primitve> {
+    fn to_primitives(self) -> Vec<Primitive> {
         // TODO: path filling here
         self.to_stroke_path().to_primitives()
     }

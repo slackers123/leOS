@@ -665,7 +665,7 @@ impl UiContext {
     }
 }
 
-pub fn gui_test() {
+pub fn gui_test() -> Vec<drawlib::stroking::Path> {
     use SizeUnit::*;
     let mut ui = UiContext::root_container();
 
@@ -749,5 +749,5 @@ pub fn gui_test() {
 
     dbg!(pos);
 
-    todo!("better widget api")
+    todo!("generate primitives")
 }

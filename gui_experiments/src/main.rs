@@ -12,7 +12,11 @@ mod imgsave;
 // mod parsertest;
 
 fn main() {
-    guilib::gui_test();
+    let shapes = guilib::gui_test();
+
+    let primitives = drawlib::tesselate(&shapes);
+
+    let img = renderlib::draw_primitives(&primitives);
 
     // let toks = htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");

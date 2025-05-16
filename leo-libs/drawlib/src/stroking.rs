@@ -14,11 +14,12 @@ use mathlib::{
     matrix::Mat,
     vectors::Vec2,
 };
-
-use crate::{
-    drawable::Drawable,
-    primitive::{Material, Mesh, Primitve},
+use renderlib::{
+    material::Material,
+    primitive::{Mesh, MeshType, Primitive},
 };
+
+use crate::drawable::Drawable;
 
 pub const QUALITY_DEG: Float = 10.0;
 const QUALITY: Float = QUALITY_DEG / 180.0 * PI;
@@ -40,7 +41,7 @@ pub struct Path {
 }
 
 impl Drawable for Path {
-    fn to_primitives(self) -> Vec<Primitve> {
+    fn to_primitives(self) -> Vec<Primitive> {
         let mut res_vertices = vec![];
         for (i, seg) in self.segs.iter().enumerate() {
             let res = stroke(seg, self.width)
@@ -121,8 +122,9 @@ impl Drawable for Path {
             }
         }
 
-        return vec![Primitve {
+        return vec![Primitive {
             mesh: Mesh {
+                ty: MeshType::Triangle,
                 indices: (0..res_vertices.len()).into_iter().collect(),
                 vertices: res_vertices,
             },
