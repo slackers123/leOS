@@ -2,6 +2,7 @@ use corelib::types::Float;
 use mathlib::color::ColA;
 
 /// The material of a Mesh or Point Strip
+#[derive(Debug)]
 pub enum Material {
     SingleColor(ColA),
     SimpleGradient {
@@ -13,4 +14,5 @@ pub enum Material {
     Texture(Texture),
 }
 
+#[derive(Debug)]
 pub struct Texture;

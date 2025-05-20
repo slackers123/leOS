@@ -2,6 +2,7 @@
 use std::{fmt::Debug, sync::Arc};
 
 use corelib::types::Float;
+use drawlib::path::Path;
 use mathlib::vectors::Vec2F;
 use widgets::button::Button;
 
@@ -223,6 +224,20 @@ pub struct FinalBox {
     pub pos: Vec2F,
     pub size: Rect,
     pub color: UiColor,
+}
+
+impl FinalBox {
+    pub fn to_path(self) -> Path {
+        drawlib::shape_primitive::rect::Rect::new(
+            self.pos.x,
+            self.pos.y,
+            self.size.width,
+            self.size.height,
+            0.0,
+            0.0,
+        )
+        .to_path()
+    }
 }
 
 #[derive(Debug)]
@@ -665,7 +680,7 @@ impl UiContext {
     }
 }
 
-pub fn gui_test() -> Vec<drawlib::stroking::Path> {
+pub fn gui_test() -> Vec<Path> {
     use SizeUnit::*;
     let mut ui = UiContext::root_container();
 
@@ -747,7 +762,5 @@ pub fn gui_test() -> Vec<drawlib::stroking::Path> {
 
     let pos = gsh.position(Vec2F::ZERO);
 
-    dbg!(pos);
-
-    todo!("generate primitives")
+    pos.into_iter().map(|p| p.to_path()).collect()
 }

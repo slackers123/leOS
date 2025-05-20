@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 corelib = {path = "../corelib"}
 mathlib = {path = "../mathlib"}
+image = "0.25"

@@ -85,6 +85,10 @@ impl Rect {
 
         Self(path)
     }
+
+    pub fn to_path(self) -> Path {
+        self.0
+    }
 }
 
 impl Drawable for Rect {

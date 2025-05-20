@@ -18,6 +18,8 @@ fn main() {
 
     let img = renderlib::draw_primitives(&primitives);
 
+    img.save("out.png").unwrap();
+
     // let toks = htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");
 

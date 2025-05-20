@@ -1,5 +1,6 @@
+use drawable::Drawable;
+use path::Path;
 use renderlib::primitive::Primitive;
-use stroking::Path;
 
 pub mod draw_target;
 pub mod drawable;
@@ -11,5 +12,8 @@ pub mod stroking;
 pub mod text;
 
 pub fn tesselate(primitives: &[Path]) -> Vec<Primitive> {
-    todo!()
+    primitives
+        .into_iter()
+        .flat_map(|p| p.to_stroke_path().to_primitives())
+        .collect()
 }
