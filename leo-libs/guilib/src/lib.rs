@@ -687,7 +687,7 @@ pub fn gui_test() -> Vec<Path> {
     ui.add(
         UiBox {
             sizing: Sizing {
-                width: Fixed(1600.0),
+                width: Fixed(500.0),
                 height: Fit {},
             },
             background: UiColor::BLUE,
@@ -705,15 +705,15 @@ pub fn gui_test() -> Vec<Path> {
                     ..Default::default()
                 },
                 |ui| {
-                    for i in 0..10 {
-                        ui.add(
-                            UiBox {
-                                child_gap: i as Float,
-                                ..Default::default()
-                            },
-                            |_| {},
-                        );
-                    }
+                    // for i in 0..10 {
+                    //     ui.add(
+                    //         UiBox {
+                    //             child_gap: i as Float,
+                    //             ..Default::default()
+                    //         },
+                    //         |_| {},
+                    //     );
+                    // }
                 },
             );
 
@@ -721,7 +721,7 @@ pub fn gui_test() -> Vec<Path> {
                 UiBox {
                     sizing: Sizing {
                         width: Grow,
-                        height: Grow,
+                        height: Fixed(150.0),
                     },
                     background: UiColor::YELLOW,
                     ..Default::default()

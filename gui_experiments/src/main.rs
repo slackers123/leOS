@@ -1,24 +1,45 @@
-use std::io::Lines;
-
-use drawlib::{
-    drawable::Drawable,
-    shape_primitive::{circle::Circle, ellipse::Ellipse, line::Line, rect::Rect},
-    stroking::{JoinType, Path, PathSeg},
-};
-use imgsave::Qimg;
-use mathlib::vectors::Vec2;
-
-mod imgsave;
+// mod imgsave;
 // mod parsertest;
 
+use std::fs;
+
 fn main() {
-    let shapes = guilib::gui_test();
+    let file = fs::read("../test-data/qoi_test_images/wikipedia_008.qoi").unwrap();
 
-    let primitives = drawlib::tesselate(&shapes);
+    let mut reader = corelib::reader::Reader::new_big_endian(&file, 0);
 
-    let img = renderlib::draw_primitives(&primitives);
+    let reader = qoilib::reader::QoiReader::new(&mut reader);
 
-    img.save("out.png").unwrap();
+    let (header, img) = reader.read_entire_image();
+
+    let mut file = fs::File::create("test.qoi").unwrap();
+
+    let mut writer = qoilib::QoiWriter::new(header, &img, &mut file);
+
+    writer.write();
+    // let shapes = guilib::gui_test();
+
+    // use drawlib::path::PathSeg::*;
+
+    // let shapes = vec![drawlib::path::Path {
+    //     pos: Vec2 { x: 0.0, y: 0.0 },
+    //     path_segs: [MoveTo, LineTo, LineTo, LineTo, LineTo, ClosePath],
+    //     vals: [0.0, 750.0, 0.0, 750.0, 0.0, 750.0, 0.0, 750.0, 0.0, 750.0],
+    //     bbox: AABB {
+    //         min: Vec2 { x: 0.0, y: 750.0 },
+    //         max: Vec2 { x: 0.0, y: 750.0 },
+    //     },
+    // }];
+
+    // let primitives = drawlib::tesselate(&shapes);
+
+    // for (i, prim) in primitives.iter().enumerate() {
+    //     println!("{i} {prim:?}");
+    // }
+
+    // let img = renderlib::draw_primitives(&primitives);
+
+    // img.save("out.png").unwrap();
 
     // let toks = htmllib::tokenize(std::fs::read_to_string("sample-html-files-sample1.html").unwrap());
     // println!("{toks:?}");

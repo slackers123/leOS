@@ -5,6 +5,7 @@ pub mod path_drawable;
 
 pub mod builder;
 
+#[derive(Debug)]
 pub struct Path {
     pub pos: Vec2<Float>,
     path_segs: Vec<PathSeg>,
@@ -178,6 +179,7 @@ impl Path {
     }
 }
 
+#[derive(Debug)]
 pub enum PathSeg {
     MoveTo,
     LineTo,

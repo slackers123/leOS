@@ -115,6 +115,19 @@ impl Readable for i8 {
     }
 }
 
+impl<const N: usize> Readable for [u8; N] {
+    #[inline]
+    fn read(reader: &mut Reader<impl ByteReader>) -> Self {
+        let mut res = [0; N];
+
+        for i in 0..N {
+            res[i] = reader.read();
+        }
+
+        res
+    }
+}
+
 impl_number_readable!(i16, u8, 8);
 impl_number_readable!(i32, u16, 16);
 impl_number_readable!(i64, u32, 32);

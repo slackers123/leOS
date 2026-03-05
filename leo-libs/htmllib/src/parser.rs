@@ -1,5 +1,4 @@
 use crate::{
-    element::Element,
     html_namespace::{HTML_INTEGRATION_POINT, HTML_NAMESPACE},
     mathml::MATHML_TEXT_INTEGRATION_POINT,
     node::Node,
