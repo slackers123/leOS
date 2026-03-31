@@ -14,6 +14,7 @@ mathlib = { path = "../leo-libs/mathlib" }
 ttflib = { path = "../leo-libs/ttflib" }
 corelib = { path = "../leo-libs/corelib" }
 qoilib = { path = "../leo-libs/qoilib" }
+imglib = { path = "../leo-libs/imglib" }
 # pnglib = { path = "../leo-libs/pnglib" }
 # htmllib = { path = "../leo-libs/htmllib" }
 regexlib = { path = "../leo-libs/regexlib" }

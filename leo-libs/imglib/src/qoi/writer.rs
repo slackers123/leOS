@@ -1,9 +1,8 @@
 use std::io::Write;
 
 use corelib::reader::{ByteReader, Readable, Reader};
-use imglib::Rgba;
 
-pub mod reader;
+use crate::Rgba;
 
 #[derive(Debug)]
 pub struct QoiHeader {

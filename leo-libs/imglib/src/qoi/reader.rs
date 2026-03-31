@@ -1,7 +1,8 @@
 use corelib::reader::{BigEndianReader, Reader};
-use imglib::Rgba;
 
-use crate::QoiHeader;
+use crate::Rgba;
+
+use super::writer::QoiHeader;
 
 pub struct QoiReader<'data> {
     reader: &'data mut Reader<'data, BigEndianReader>,
