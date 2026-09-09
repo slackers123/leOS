@@ -14,5 +14,20 @@ pub enum Material {
     Texture(Texture),
 }
 
+impl Material {
+    pub fn get_color(&self) -> ColA {
+        match self {
+            Self::SingleColor(col) => *col,
+            Self::SimpleGradient {
+                color1,
+                color2,
+                direction,
+                size,
+            } => *color1,
+            Self::Texture(t) => ColA::GREEN,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Texture;

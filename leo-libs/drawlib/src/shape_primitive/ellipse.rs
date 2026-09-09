@@ -2,14 +2,14 @@ use corelib::types::Float;
 use mathlib::vectors::Vec2;
 use renderlib::primitive::Primitive;
 
-use crate::{drawable::Drawable, path::Path};
+use crate::{drawable::Drawable, path::Path, path_attr::PathAttrs};
 
 /// https://www.w3.org/TR/SVG2/shapes.html#EllipseElement
 pub struct Ellipse(Path);
 
 impl Ellipse {
-    pub fn new(cx: Float, cy: Float, rx: Float, ry: Float) -> Self {
-        let mut path = Path::new();
+    pub fn new(cx: Float, cy: Float, rx: Float, ry: Float, attrs: PathAttrs) -> Self {
+        let mut path = Path::new(attrs);
 
         // A move-to command to the point cx+rx,cy;
         path.move_to(Vec2::new(cx + rx, cy));

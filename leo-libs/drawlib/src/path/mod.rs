@@ -1,9 +1,9 @@
 use corelib::types::Float;
 use mathlib::{aabb::AABB, elliptical_arc::EllipticalArc, vectors::Vec2};
 
-pub mod path_drawable;
+use crate::path_attr::PathAttrs;
 
-pub mod builder;
+pub mod path_drawable;
 
 #[derive(Debug)]
 pub struct Path {
@@ -11,15 +11,17 @@ pub struct Path {
     path_segs: Vec<PathSeg>,
     vals: Vec<Float>,
     bbox: AABB<Float>,
+    path_attrs: PathAttrs,
 }
 
 impl Path {
-    pub fn new() -> Self {
+    pub fn new(path_attrs: PathAttrs) -> Self {
         Self {
             pos: Vec2::ZERO,
             path_segs: Vec::new(),
             vals: Vec::new(),
             bbox: AABB::default(),
+            path_attrs,
         }
     }
 
@@ -173,8 +175,7 @@ impl Path {
         crate::stroking::Path {
             // TODO: make these actual parameters
             segs,
-            join_type: crate::stroking::JoinType::None,
-            width: 10.0,
+            attrs: self.path_attrs.clone(),
         }
     }
 }

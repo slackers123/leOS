@@ -6,7 +6,7 @@ use crate::vectors::Vec2;
 ///
 /// # Note:
 /// This returns none if the lines are parallell
-pub fn intersect_two_lines(
+pub fn line_line(
     p1: Vec2<Float>,
     dir1: Vec2<Float>,
     p2: Vec2<Float>,

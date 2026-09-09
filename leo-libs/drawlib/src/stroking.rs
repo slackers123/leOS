@@ -10,7 +10,7 @@ use mathlib::{
     elliptical_arc::EllipticalArcEquation,
     equations::{EquationRoots, QuadraticEquation},
     funcs::approx_in_range_01,
-    intersect::intersect_two_lines,
+    intersect::line_line,
     matrix::Mat,
     vectors::Vec2,
 };
@@ -19,12 +19,12 @@ use renderlib::{
     primitive::{Mesh, MeshType, Primitive},
 };
 
-use crate::drawable::Drawable;
+use crate::{drawable::Drawable, path_attr::PathAttrs};
 
 pub const QUALITY_DEG: Float = 10.0;
 const QUALITY: Float = QUALITY_DEG / 180.0 * PI;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum JoinType {
     None,
     Miter,
@@ -36,18 +36,16 @@ pub enum JoinType {
 
 pub struct Path {
     pub segs: Vec<PathSeg>,
-    pub join_type: JoinType,
-    pub width: Float,
+    pub attrs: PathAttrs,
 }
 
 impl Drawable for Path {
     fn to_primitives(self) -> Vec<Primitive> {
         let mut res_vertices = vec![];
+        // FIXME: actually use the logical to physical conversion
+        let width = self.attrs.stroke.width.val;
         for (i, seg) in self.segs.iter().enumerate() {
-            let res = stroke(seg, self.width)
-                .into_iter()
-                .map(|v| (v.0, v.1))
-                .collect::<Vec<_>>();
+            let res = stroke(seg, width);
 
             for i in 0..res.len() - 1 {
                 res_vertices.push(res[i].0);
@@ -62,21 +60,23 @@ impl Drawable for Path {
             if self.segs.len() > 1 && i > 0 {
                 let dir2 = seg.init_norm_grad();
                 let dir1 = self.segs[i - 1].term_norm_grad();
+
                 if dir1 == dir2 {
                     continue;
                 }
+
                 let angle = dir2.angle_to(&dir1);
 
                 let (p1, p2) = if angle > 0.0 {
-                    (seg.init_p(self.width), self.segs[i - 1].term_p(self.width))
+                    (seg.init_p(width), self.segs[i - 1].term_p(width))
                 } else {
-                    (seg.init_n(self.width), self.segs[i - 1].term_n(self.width))
+                    (seg.init_n(width), self.segs[i - 1].term_n(width))
                 };
 
-                match self.join_type {
+                match self.attrs.stroke.join {
                     JoinType::None => {}
                     JoinType::Miter => {
-                        let p3 = intersect_two_lines(p1, dir1, p2, dir2).unwrap();
+                        let p3 = line_line(p1, dir1, p2, dir2).unwrap();
 
                         // FIXME: this is slightly off (rounding)
 
@@ -99,21 +99,21 @@ impl Drawable for Path {
                     }
 
                     JoinType::Round => {
-                        let J = (angle / QUALITY).ceil() as usize;
+                        let J = (angle / QUALITY).ceil().abs() as usize;
 
                         let center = seg.generator(0.0);
 
                         let mut last = p1;
                         for i in 1..=J {
+                            println!("last {last:?}");
                             let t = i as Float / J as Float;
                             let n_angle = dir1.x_angle() + (angle * t);
-                            let new = Vec2::dir(n_angle) * (self.width / 2.0);
+                            let new = Vec2::dir(n_angle) * (width / 2.0);
                             res_vertices.push(last);
                             res_vertices.push(center);
                             res_vertices.push(center + new);
-                            last = new;
+                            last = center + new;
                         }
-                        println!("{:?}", p1);
                     }
                     _ => todo!(
                         "only 'none', 'miter', 'bevel', and 'round' are supported as join types"
@@ -128,11 +128,12 @@ impl Drawable for Path {
                 indices: (0..res_vertices.len()).into_iter().collect(),
                 vertices: res_vertices,
             },
-            material: Material::SingleColor(ColA::WHITE),
+            material: Material::SingleColor(self.attrs.stroke.color),
         }];
     }
 }
 
+#[derive(Debug)]
 pub enum PathSeg {
     CubicBezier {
         P_A: Vec2<Float>,
@@ -165,7 +166,7 @@ impl PathSeg {
         let t1 = eq.initial_tangent();
         let t2 = eq.terminal_tangent();
 
-        let P_B = intersect_two_lines(P_A, t1, P_C, t2).unwrap(); // FIXME: handle the exact half circles
+        let P_B = line_line(P_A, t1, P_C, t2).unwrap(); // FIXME: handle the exact half circles
 
         let w_B = (eq.angle_delta / 2.0).cos();
 
@@ -362,11 +363,8 @@ impl PathSeg {
                 .filter(|t| approx_in_range_01(*t))
                 .collect::<Vec<_>>();
 
-                if res.len() == 0 {
-                    (res, true)
-                } else {
-                    (res, false)
-                }
+                let more_needed = res.len() == 0;
+                (res, more_needed)
             }
         }
     }

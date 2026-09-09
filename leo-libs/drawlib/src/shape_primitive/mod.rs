@@ -1,3 +1,5 @@
+//! primitive shapes according to the svg spec
+
 pub mod circle;
 pub mod ellipse;
 pub mod line;

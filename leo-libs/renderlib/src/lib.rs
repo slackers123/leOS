@@ -1,5 +1,7 @@
-use corelib::types::{Float, Uint};
-use imglib::{Rgba, RgbaImage};
+use std::num::NonZeroUsize;
+
+use corelib::types::Float;
+use imglib::{RgbaF32, RgbaF32Image, RgbaU8};
 // use image::{ImageBuffer, Rgb, RgbImage};
 use mathlib::vectors::Vec2;
 use primitive::{MeshType, Primitive};
@@ -7,7 +9,9 @@ use primitive::{MeshType, Primitive};
 pub mod material;
 pub mod primitive;
 
-pub fn draw_primitives(prims: &[Primitive], target: &mut RgbaImage) {
+pub const MSAA_COUNT: NonZeroUsize = NonZeroUsize::new(4).unwrap();
+
+pub fn draw_primitives(prims: &[Primitive], target: &mut RgbaF32Image) {
     for primitive in prims {
         match primitive.mesh.ty {
             MeshType::Triangle => {
@@ -43,26 +47,64 @@ pub fn draw_primitives(prims: &[Primitive], target: &mut RgbaImage) {
 
                     for y in min_y as usize..=max_y as usize {
                         for x in min_x as usize..=max_x as usize {
-                            let p = Vec2::new(x as Float, y as Float);
+                            let mut hit_cnt = 0;
+                            for i in 0..MSAA_COUNT.get() {
+                                let base = MSAA_COUNT.get().isqrt();
 
-                            let edge1 = (trib.x - tria.x) * (p.y - tria.y)
-                                - (trib.y - tria.y) * (p.x - tria.x);
-                            let edge2 = (tric.x - trib.x) * (p.y - trib.y)
-                                - (tric.y - trib.y) * (p.x - trib.x);
-                            let edge3 = (tria.x - tric.x) * (p.y - tric.y)
-                                - (tria.y - tric.y) * (p.x - tric.x);
+                                let x_off = (i % base) as Float / base as Float;
+                                let y_off = (i / base) as Float / base as Float;
 
-                            if edge1 >= 0.0 && edge2 >= 0.0 && edge3 >= 0.0 {
-                                target.put_pixel(
-                                    x,
-                                    y,
-                                    Rgba {
-                                        r: 55,
-                                        g: 255,
-                                        b: 255,
-                                        a: 255,
-                                    },
-                                );
+                                let p = Vec2::new(x as Float + x_off, y as Float + y_off);
+
+                                let edge1 = (trib.x - tria.x) * (p.y - tria.y)
+                                    - (trib.y - tria.y) * (p.x - tria.x);
+                                let edge2 = (tric.x - trib.x) * (p.y - trib.y)
+                                    - (tric.y - trib.y) * (p.x - trib.x);
+                                let edge3 = (tria.x - tric.x) * (p.y - tric.y)
+                                    - (tria.y - tric.y) * (p.x - tric.x);
+
+                                if edge1 >= 0.0 && edge2 >= 0.0 && edge3 >= 0.0 {
+                                    hit_cnt += 1;
+                                }
+                            }
+
+                            if hit_cnt != 0 {
+                                if hit_cnt == MSAA_COUNT.get() {
+                                    let col = primitive.material.get_color();
+                                    target.put_pixel(x, y, RgbaF32::from_cola(col));
+                                } else {
+                                    let hit_share = hit_cnt as Float / MSAA_COUNT.get() as Float;
+
+                                    let mut top_col = primitive.material.get_color();
+                                    top_col.a *= hit_share;
+
+                                    let bottom_col = target.get_pixel(x, y);
+
+                                    let a_out = top_col.a + bottom_col.a * (1. - top_col.a);
+
+                                    let r_out = (top_col.r * top_col.a
+                                        + bottom_col.r * bottom_col.a * (1. - top_col.a))
+                                        / a_out;
+
+                                    let g_out = (top_col.g * top_col.a
+                                        + bottom_col.g * bottom_col.a * (1. - top_col.a))
+                                        / a_out;
+
+                                    let b_out = (top_col.b * top_col.a
+                                        + bottom_col.b * bottom_col.a * (1. - top_col.a))
+                                        / a_out;
+
+                                    target.put_pixel(
+                                        x,
+                                        y,
+                                        RgbaF32 {
+                                            r: r_out,
+                                            g: g_out,
+                                            b: b_out,
+                                            a: (top_col.a + bottom_col.a).clamp(0., 1.),
+                                        },
+                                    );
+                                }
                             }
                         }
                     }

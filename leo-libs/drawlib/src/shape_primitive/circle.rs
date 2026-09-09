@@ -2,7 +2,7 @@ use corelib::types::Float;
 use mathlib::vectors::Vec2;
 use renderlib::primitive::Primitive;
 
-use crate::{drawable::Drawable, path::Path};
+use crate::{drawable::Drawable, path::Path, path_attr::PathAttrs};
 
 /// https://www.w3.org/TR/SVG2/shapes.html#CircleElement
 pub struct Circle(Path);
@@ -11,8 +11,8 @@ impl Circle {
     /// https://www.w3.org/TR/SVG2/shapes.html#CircleElement
     // FIXME: the document calls for the sweep flag to be zero but this does not make a lot
     // of sense
-    pub fn new(cx: Float, cy: Float, r: Float) -> Self {
-        let mut path = Path::new();
+    pub fn new(cx: Float, cy: Float, r: Float, attrs: PathAttrs) -> Self {
+        let mut path = Path::new(attrs);
 
         // A move-to command to the point cx+r,cy;
         path.move_to(Vec2::new(cx + r, cy));

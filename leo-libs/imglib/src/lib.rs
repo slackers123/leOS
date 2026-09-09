@@ -1,22 +1,75 @@
 use std::{io::Write, marker::PhantomData};
 
+use mathlib::color::ColA;
+
 pub mod qoi;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RgbaF32 {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl RgbaF32 {
+    pub const BLACK: Self = Self {
+        r: 0.,
+        g: 0.,
+        b: 0.,
+        a: 1.,
+    };
+
+    pub const TRANSPARENT: Self = Self {
+        r: 0.,
+        g: 0.,
+        b: 0.,
+        a: 0.,
+    };
+
+    pub fn from_cola(col: ColA) -> Self {
+        Self {
+            r: col.r,
+            g: col.g,
+            b: col.b,
+            a: col.a,
+        }
+    }
+
+    pub fn to_u8(self) -> RgbaU8 {
+        RgbaU8 {
+            r: (self.r * 255.) as u8,
+            g: (self.g * 255.) as u8,
+            b: (self.b * 255.) as u8,
+            a: (self.a * 255.) as u8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Rgba {
+pub struct RgbaU8 {
     pub r: u8,
     pub g: u8,
     pub b: u8,
     pub a: u8,
 }
 
-impl Rgba {
-    pub const BLACK: Self = Rgba {
+impl RgbaU8 {
+    pub const BLACK: Self = RgbaU8 {
         r: 0,
         g: 0,
         b: 0,
         a: 255,
     };
+
+    pub fn from_cola(col: ColA) -> Self {
+        Self {
+            r: (col.r * 255.) as u8,
+            g: (col.g * 255.) as u8,
+            b: (col.b * 255.) as u8,
+            a: (col.a * 255.) as u8,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +79,9 @@ pub struct Rgb {
     pub b: u8,
 }
 
-pub type RgbaImage = Image<Rgba>;
+pub type RgbaU8Image = Image<RgbaU8>;
+
+pub type RgbaF32Image = Image<RgbaF32>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Image<Pix, Cont = Vec<Pix>> {
@@ -46,6 +101,14 @@ impl<Pix: Copy> Image<Pix> {
         }
     }
 
+    pub fn get_pixel(&mut self, x: usize, y: usize) -> Pix {
+        self.data[y * self.width + x]
+    }
+
+    pub fn get_pixel_mut(&mut self, x: usize, y: usize) -> &mut Pix {
+        &mut self.data[y * self.width + x]
+    }
+
     pub fn dimensions(&self) -> (usize, usize) {
         (self.width, self.height)
     }
@@ -55,9 +118,9 @@ impl<Pix: Copy> Image<Pix> {
     }
 }
 
-impl Image<Rgba> {
+impl Image<RgbaU8> {
     pub fn save(self, target: &str) -> std::io::Result<()> {
-        let mut file = std::fs::File::create("test.qoi").unwrap();
+        let mut file = std::fs::File::create(target).unwrap();
         let mut writer = qoi::writer::QoiWriter::new(
             qoi::writer::QoiHeader {
                 width: self.width as u32,
@@ -72,5 +135,16 @@ impl Image<Rgba> {
         file.flush()?;
 
         Ok(())
+    }
+}
+
+impl Image<RgbaF32> {
+    pub fn to_u8(self) -> Image<RgbaU8> {
+        Image {
+            data: self.data.into_iter().map(|pix| pix.to_u8()).collect(),
+            width: self.width,
+            height: self.height,
+            _phant: PhantomData,
+        }
     }
 }

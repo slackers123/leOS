@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use corelib::reader::{ByteReader, Readable, Reader};
-use imglib::Rgba;
+use imglib::RgbaU8;
 
 pub mod reader;
 
@@ -31,26 +31,26 @@ impl Readable for QoiHeader {
 
 pub struct QoiWriter<'out, 'src, W: Write> {
     out: &'out mut W,
-    image: &'src [Rgba],
+    image: &'src [RgbaU8],
     header: QoiHeader,
-    pix_arr: [Rgba; 64],
-    previous_pixel: Rgba,
+    pix_arr: [RgbaU8; 64],
+    previous_pixel: RgbaU8,
     index: usize,
 }
 
 impl<'out, 'src, W: Write> QoiWriter<'out, 'src, W> {
-    pub fn new(header: QoiHeader, image: &'src [Rgba], out: &'out mut W) -> Self {
+    pub fn new(header: QoiHeader, image: &'src [RgbaU8], out: &'out mut W) -> Self {
         Self {
             out,
             image,
             header,
-            pix_arr: [Rgba {
+            pix_arr: [RgbaU8 {
                 r: 0,
                 g: 0,
                 b: 0,
                 a: 0,
             }; 64],
-            previous_pixel: Rgba {
+            previous_pixel: RgbaU8 {
                 r: 0,
                 g: 0,
                 b: 0,
@@ -266,7 +266,7 @@ impl<'out, 'src, W: Write> QoiWriter<'out, 'src, W> {
         self.index += 1;
     }
 
-    pub fn reg_pixel(&mut self, pix: Rgba) {
+    pub fn reg_pixel(&mut self, pix: RgbaU8) {
         let index_position =
             (pix.r as usize * 3 + pix.g as usize * 5 + pix.b as usize * 7 + pix.a as usize * 11)
                 % 64;
@@ -275,7 +275,7 @@ impl<'out, 'src, W: Write> QoiWriter<'out, 'src, W> {
     }
 
     #[inline]
-    pub fn color_is_registered(&mut self, pix: Rgba) -> bool {
+    pub fn color_is_registered(&mut self, pix: RgbaU8) -> bool {
         let index_position =
             (pix.r as usize * 3 + pix.g as usize * 5 + pix.b as usize * 7 + pix.a as usize * 11)
                 % 64;

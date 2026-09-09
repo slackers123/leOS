@@ -20,3 +20,4 @@ imglib = { path = "../leo-libs/imglib" }
 regexlib = { path = "../leo-libs/regexlib" }
 guilib = { path = "../leo-libs/guilib" }
 renderlib = { path = "../leo-libs/renderlib" }
+dpilib = {path = "../leo-libs/dpilib"}

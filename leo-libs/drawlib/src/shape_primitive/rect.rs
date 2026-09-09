@@ -2,15 +2,23 @@ use corelib::types::Float;
 use mathlib::vectors::Vec2;
 use renderlib::primitive::Primitive;
 
-use crate::{drawable::Drawable, path::Path};
+use crate::{drawable::Drawable, path::Path, path_attr::PathAttrs};
 
 /// https://www.w3.org/TR/SVG2/shapes.html#RectElement
 pub struct Rect(Path);
 
 impl Rect {
     /// https://www.w3.org/TR/SVG2/shapes.html#RectElement
-    pub fn new(x: Float, y: Float, width: Float, height: Float, rx: Float, ry: Float) -> Self {
-        let mut path = crate::path::Path::new();
+    pub fn new(
+        x: Float,
+        y: Float,
+        width: Float,
+        height: Float,
+        rx: Float,
+        ry: Float,
+        attrs: PathAttrs,
+    ) -> Self {
+        let mut path = crate::path::Path::new(attrs);
         // perform an absolute moveto operation to location (x+rx,y);
         path.move_to(Vec2::new(x + rx, y));
 

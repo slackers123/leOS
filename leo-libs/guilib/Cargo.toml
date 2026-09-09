@@ -7,3 +7,4 @@ edition = "2024"
 corelib = {path = "../corelib"}
 mathlib = {path = "../mathlib"}
 drawlib = {path = "../drawlib"}
+dpilib = {path = "../dpilib"}

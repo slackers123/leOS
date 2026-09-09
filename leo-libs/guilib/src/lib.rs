@@ -2,8 +2,12 @@
 use std::{fmt::Debug, sync::Arc};
 
 use corelib::types::Float;
-use drawlib::path::Path;
-use mathlib::vectors::Vec2F;
+use dpilib::LUnit;
+use drawlib::{
+    path::Path,
+    path_attr::{PathAttrs, PathFill, PathStroke},
+};
+use mathlib::{color::ColA, vectors::Vec2F};
 use widgets::button::Button;
 
 pub mod base;
@@ -14,44 +18,6 @@ pub struct Node {
     pub children: Vec<Node>,
     pub pos: Option<Vec2F>,
     pub size: Vec2F,
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct UiColor {
-    pub r: Float,
-    pub g: Float,
-    pub b: Float,
-    pub a: Float,
-}
-
-impl UiColor {
-    pub const PINK: UiColor = UiColor {
-        r: 1.0,
-        g: 0.7529411765,
-        b: 0.7960784314,
-        a: 1.0,
-    };
-
-    pub const BLUE: UiColor = UiColor {
-        r: 0.0,
-        g: 0.0,
-        b: 1.0,
-        a: 1.0,
-    };
-
-    pub const LIGHT_BLUE: UiColor = UiColor {
-        r: 0.678,
-        g: 0.847,
-        b: 0.902,
-        a: 1.0,
-    };
-
-    pub const YELLOW: UiColor = UiColor {
-        r: 1.0,
-        g: 1.0,
-        b: 0.0,
-        a: 1.0,
-    };
 }
 
 pub trait Widget<I>: Debug + Sized + Clone {
@@ -114,7 +80,7 @@ impl Debug for WidgetInt {
 #[derive(Debug, Clone)]
 pub struct UiBox {
     pub sizing: Sizing,
-    pub background: UiColor,
+    pub background: ColA,
     pub layout_dir: LayoutDir,
     pub padding: Padding,
     pub child_gap: Float,
@@ -132,7 +98,7 @@ impl Default for UiBox {
             max_width: Float::INFINITY,
             max_height: Float::INFINITY,
             sizing: Sizing::default(),
-            background: UiColor::default(),
+            background: ColA::default(),
             layout_dir: LayoutDir::default(),
             padding: Padding::default(),
             child_gap: f32::default(),
@@ -223,7 +189,7 @@ pub struct Rect {
 pub struct FinalBox {
     pub pos: Vec2F,
     pub size: Rect,
-    pub color: UiColor,
+    pub color: ColA,
 }
 
 impl FinalBox {
@@ -235,6 +201,14 @@ impl FinalBox {
             self.size.height,
             0.0,
             0.0,
+            PathAttrs {
+                stroke: PathStroke {
+                    width: LUnit { val: 10.0 },
+                    color: self.color,
+                    join: drawlib::stroking::JoinType::Round,
+                },
+                fill: PathFill { color: self.color },
+            },
         )
         .to_path()
     }
@@ -688,9 +662,9 @@ pub fn gui_test() -> Vec<Path> {
         UiBox {
             sizing: Sizing {
                 width: Fixed(500.0),
-                height: Fit {},
+                height: Fit,
             },
-            background: UiColor::BLUE,
+            background: ColA::BLUE,
             layout_dir: LayoutDir::TopToBottom,
             ..Default::default()
         },
@@ -701,7 +675,7 @@ pub fn gui_test() -> Vec<Path> {
                         width: Fixed(300.0),
                         height: Fixed(300.0),
                     },
-                    background: UiColor::PINK,
+                    background: ColA::PINK,
                     ..Default::default()
                 },
                 |ui| {
@@ -723,7 +697,7 @@ pub fn gui_test() -> Vec<Path> {
                         width: Grow,
                         height: Fixed(150.0),
                     },
-                    background: UiColor::YELLOW,
+                    background: ColA::YELLOW,
                     ..Default::default()
                 },
                 |_| {},
@@ -735,7 +709,7 @@ pub fn gui_test() -> Vec<Path> {
                         width: Fixed(300.0),
                         height: Fixed(300.0),
                     },
-                    background: UiColor::LIGHT_BLUE,
+                    background: ColA::LIGHT_BLUE,
                     ..Default::default()
                 },
                 |_| {},

@@ -1,11 +1,16 @@
 // mod imgsave;
 // mod parsertest;
 
-use std::fs;
+use std::{fs, ptr::read};
 
-use drawlib::shape_primitive::line::Line;
-use imglib::{Rgba, RgbaImage};
-use mathlib::{bezier::CubicBezier, elliptical_arc::EllipticalArc, vectors::Vec2};
+use dpilib::LUnit;
+use drawlib::{
+    path_attr::{PathAttrs, PathFill, PathStroke},
+    shape_primitive::{line::Line, rect::Rect},
+    stroking::JoinType,
+};
+use imglib::{RgbaF32, RgbaF32Image, RgbaU8, RgbaU8Image};
+use mathlib::{bezier::CubicBezier, color::ColA, elliptical_arc::EllipticalArc, vectors::Vec2};
 
 // use crate::imgsave::Qimg;
 
@@ -23,29 +28,36 @@ fn main() {
     // let mut writer = qoilib::QoiWriter::new(header, &img, &mut file);
 
     // writer.write();
-    let shapes = guilib::gui_test();
 
-    // use drawlib::path::PathSeg::*;
+    // let shapes = guilib::gui_test();
+    // let primitives = drawlib::tesselate(&shapes);
 
-    // let shapes = vec![drawlib::path::Path {
-    //     pos: Vec2 { x: 0.0, y: 0.0 },
-    //     path_segs: [MoveTo, LineTo, LineTo, LineTo, LineTo, ClosePath],
-    //     vals: [0.0, 750.0, 0.0, 750.0, 0.0, 750.0, 0.0, 750.0, 0.0, 750.0],
-    //     bbox: AABB {
-    //         min: Vec2 { x: 0.0, y: 750.0 },
-    //         max: Vec2 { x: 0.0, y: 750.0 },
-    //     },
-    // }];
+    let rect = Rect::new(
+        10.,
+        10.,
+        200.,
+        200.,
+        0.,
+        0.,
+        PathAttrs {
+            stroke: PathStroke {
+                color: ColA::PINK,
+                width: LUnit::new(20.0),
+                join: JoinType::Miter,
+            },
+            fill: PathFill { color: ColA::GREEN },
+        },
+    );
 
-    let primitives = drawlib::tesselate(&shapes);
+    let path = rect.to_path();
 
-    // for (i, prim) in primitives.iter().enumerate() {
-    //     println!("{i} {prim:?}");
-    // }
+    println!("{path:?}");
 
-    let mut image = RgbaImage::new(1000, 1000, Rgba::BLACK);
+    let primitives = drawlib::tesselate(&[path]);
+
+    let mut image = RgbaF32Image::new(1000, 1000, RgbaF32::TRANSPARENT);
     renderlib::draw_primitives(&primitives, &mut image);
-    image.save("test.qoi").unwrap();
+    image.to_u8().save("test.qoi").unwrap();
     println!("asdf");
 
     // img.save("out.png").unwrap();

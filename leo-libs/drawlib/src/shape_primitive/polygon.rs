@@ -2,13 +2,13 @@ use corelib::types::Float;
 use mathlib::vectors::Vec2;
 use renderlib::primitive::Primitive;
 
-use crate::{drawable::Drawable, path::Path};
+use crate::{drawable::Drawable, path::Path, path_attr::PathAttrs};
 
 pub struct Polygon(Path);
 
 impl Polygon {
-    pub fn new(points: Vec<Float>) -> Self {
-        let mut path = Path::new();
+    pub fn new(points: Vec<Float>, attrs: PathAttrs) -> Self {
+        let mut path = Path::new(attrs);
 
         if points.len() < 2 {
             return Self(path);

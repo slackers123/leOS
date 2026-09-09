@@ -1,15 +1,15 @@
 use corelib::reader::{BigEndianReader, Reader};
 
-use crate::Rgba;
+use crate::RgbaU8;
 
 use super::writer::QoiHeader;
 
 pub struct QoiReader<'data> {
     reader: &'data mut Reader<'data, BigEndianReader>,
     header: QoiHeader,
-    pix_arr: [Rgba; 64],
-    pub result: Vec<Rgba>,
-    previous_pixel: Rgba,
+    pix_arr: [RgbaU8; 64],
+    pub result: Vec<RgbaU8>,
+    previous_pixel: RgbaU8,
 }
 
 impl<'data> QoiReader<'data> {
@@ -19,13 +19,13 @@ impl<'data> QoiReader<'data> {
             reader,
             result: Vec::with_capacity((header.height * header.width) as usize),
             header,
-            pix_arr: [Rgba {
+            pix_arr: [RgbaU8 {
                 r: 0,
                 g: 0,
                 b: 0,
                 a: 0,
             }; 64],
-            previous_pixel: Rgba {
+            previous_pixel: RgbaU8 {
                 r: 0,
                 g: 0,
                 b: 0,
@@ -34,7 +34,7 @@ impl<'data> QoiReader<'data> {
         }
     }
 
-    pub fn read_entire_image(mut self) -> (QoiHeader, Vec<Rgba>) {
+    pub fn read_entire_image(mut self) -> (QoiHeader, Vec<RgbaU8>) {
         let pic_size = self.header.width * self.header.height;
 
         while self.result.len() < pic_size as usize {
@@ -44,7 +44,7 @@ impl<'data> QoiReader<'data> {
         (self.header, self.result)
     }
 
-    fn reg_new_pix(&mut self, pix: Rgba) {
+    fn reg_new_pix(&mut self, pix: RgbaU8) {
         let index_position =
             (pix.r as usize * 3 + pix.g as usize * 5 + pix.b as usize * 7 + pix.a as usize * 11)
                 % 64;
@@ -61,7 +61,7 @@ impl<'data> QoiReader<'data> {
                 let green = self.reader.read_byte();
                 let blue = self.reader.read_byte();
 
-                self.previous_pixel = Rgba {
+                self.previous_pixel = RgbaU8 {
                     r: red,
                     g: green,
                     b: blue,
@@ -77,7 +77,7 @@ impl<'data> QoiReader<'data> {
                 let blue = self.reader.read_byte();
                 let alpha = self.reader.read_byte();
 
-                self.previous_pixel = Rgba {
+                self.previous_pixel = RgbaU8 {
                     r: red,
                     g: green,
                     b: blue,

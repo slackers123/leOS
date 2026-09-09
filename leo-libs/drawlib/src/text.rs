@@ -1,13 +1,13 @@
 use corelib::types::Float;
-use mathlib::vectors::Vec2;
+use mathlib::{color::ColA, vectors::Vec2};
 use ttflib::Font;
 
-use crate::path::Path;
+use crate::{path::Path, path_attr::PathAttrs};
 
-pub fn get_char_path(c: char, font: &Font) -> Path {
+pub fn get_char_path(c: char, font: &Font, attrs: PathAttrs) -> Path {
     // TODO: improve this / make it more performant (lots of low hanging fruit)
     let glyf = font.get_glyph(c);
-    let mut path = Path::new();
+    let mut path = Path::new(attrs);
     let mut last_was_on_curve = false;
     let mut last_off_curve = Vec2::ZERO;
     for ((i, (x, y)), flags) in glyf

@@ -76,9 +76,9 @@ impl PSize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LUnit {
-    val: Float,
+    pub val: Float,
 }
 
 impl LUnit {
